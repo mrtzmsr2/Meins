@@ -1,0 +1,120 @@
+// Curated car database for MMEINS v3.
+// Prices are approximate market values in EUR (new MSRP, or last known sale for classics/limited).
+// "tier": rough rarity bucket used for difficulty filtering.
+// Emojis act as fallback artwork (no external image dependency).
+export const CARS = [
+  // === Daily / Mainstream (easy contrast) ===
+  { id: 'vw-golf-8', brand: 'Volkswagen', model: 'Golf 8', year: 2024, price: 32000, hp: 150, category: 'Kompakt', tier: 'mainstream', emoji: '🚗' },
+  { id: 'dacia-sandero', brand: 'Dacia', model: 'Sandero', year: 2024, price: 13500, hp: 90, category: 'Kompakt', tier: 'mainstream', emoji: '🚙' },
+  { id: 'toyota-corolla', brand: 'Toyota', model: 'Corolla Hybrid', year: 2024, price: 31500, hp: 140, category: 'Kompakt', tier: 'mainstream', emoji: '🚗' },
+  { id: 'tesla-3', brand: 'Tesla', model: 'Model 3 Long Range', year: 2024, price: 49000, hp: 366, category: 'Elektro', tier: 'mainstream', emoji: '⚡' },
+  { id: 'tesla-y', brand: 'Tesla', model: 'Model Y Performance', year: 2024, price: 56000, hp: 460, category: 'Elektro-SUV', tier: 'mainstream', emoji: '⚡' },
+  { id: 'bmw-3', brand: 'BMW', model: '330i', year: 2024, price: 55000, hp: 245, category: 'Limousine', tier: 'mainstream', emoji: '🚘' },
+  { id: 'audi-a4', brand: 'Audi', model: 'A4 45 TFSI', year: 2024, price: 53000, hp: 265, category: 'Limousine', tier: 'mainstream', emoji: '🚘' },
+  { id: 'mb-cclass', brand: 'Mercedes-Benz', model: 'C 300', year: 2024, price: 58000, hp: 258, category: 'Limousine', tier: 'mainstream', emoji: '🚘' },
+  { id: 'porsche-macan', brand: 'Porsche', model: 'Macan', year: 2024, price: 73000, hp: 265, category: 'SUV', tier: 'premium', emoji: '🚙' },
+  { id: 'mb-gle', brand: 'Mercedes-Benz', model: 'GLE 450d', year: 2024, price: 92000, hp: 367, category: 'SUV', tier: 'premium', emoji: '🚙' },
+  { id: 'audi-q7', brand: 'Audi', model: 'Q7 50 TDI', year: 2024, price: 88000, hp: 286, category: 'SUV', tier: 'premium', emoji: '🚙' },
+  { id: 'bmw-x5', brand: 'BMW', model: 'X5 xDrive40i', year: 2024, price: 90000, hp: 381, category: 'SUV', tier: 'premium', emoji: '🚙' },
+
+  // === Premium / Sport ===
+  { id: 'porsche-911', brand: 'Porsche', model: '911 Carrera S', year: 2024, price: 142000, hp: 450, category: 'Sportwagen', tier: 'premium', emoji: '🏎️' },
+  { id: 'porsche-911-turbo-s', brand: 'Porsche', model: '911 Turbo S', year: 2024, price: 250000, hp: 650, category: 'Sportwagen', tier: 'premium', emoji: '🏎️' },
+  { id: 'porsche-taycan-ts', brand: 'Porsche', model: 'Taycan Turbo S', year: 2024, price: 200000, hp: 761, category: 'Elektro', tier: 'premium', emoji: '⚡' },
+  { id: 'porsche-panamera', brand: 'Porsche', model: 'Panamera Turbo', year: 2024, price: 195000, hp: 680, category: 'Limousine', tier: 'premium', emoji: '🚘' },
+  { id: 'porsche-cayenne-tgt', brand: 'Porsche', model: 'Cayenne Turbo GT', year: 2024, price: 215000, hp: 660, category: 'SUV', tier: 'premium', emoji: '🚙' },
+  { id: 'amg-gt63', brand: 'Mercedes-AMG', model: 'GT 63 S', year: 2024, price: 215000, hp: 639, category: 'Sportwagen', tier: 'premium', emoji: '🏎️' },
+  { id: 'amg-glc63', brand: 'Mercedes-AMG', model: 'GLC 63 S E', year: 2024, price: 130000, hp: 680, category: 'SUV', tier: 'premium', emoji: '🚙' },
+  { id: 'amg-eqs', brand: 'Mercedes-AMG', model: 'EQS 53', year: 2024, price: 180000, hp: 761, category: 'Elektro', tier: 'premium', emoji: '⚡' },
+  { id: 'audi-rs6', brand: 'Audi', model: 'RS 6 Avant Performance', year: 2024, price: 145000, hp: 630, category: 'Kombi', tier: 'premium', emoji: '🚘' },
+  { id: 'audi-rs-etron', brand: 'Audi', model: 'RS e-tron GT', year: 2024, price: 155000, hp: 646, category: 'Elektro', tier: 'premium', emoji: '⚡' },
+  { id: 'bmw-m5', brand: 'BMW', model: 'M5 Competition', year: 2024, price: 145000, hp: 625, category: 'Limousine', tier: 'premium', emoji: '🚘' },
+  { id: 'bmw-m8', brand: 'BMW', model: 'M8 Competition Coupé', year: 2024, price: 175000, hp: 625, category: 'Sportwagen', tier: 'premium', emoji: '🏎️' },
+  { id: 'bmw-xm', brand: 'BMW', model: 'XM', year: 2024, price: 175000, hp: 653, category: 'SUV', tier: 'premium', emoji: '🚙' },
+  { id: 'maserati-grecale', brand: 'Maserati', model: 'Grecale Trofeo', year: 2024, price: 130000, hp: 530, category: 'SUV', tier: 'premium', emoji: '🚙' },
+  { id: 'maserati-mc20', brand: 'Maserati', model: 'MC20', year: 2024, price: 245000, hp: 630, category: 'Supersportwagen', tier: 'super', emoji: '🏎️' },
+  { id: 'lotus-emira', brand: 'Lotus', model: 'Emira V6', year: 2024, price: 95000, hp: 405, category: 'Sportwagen', tier: 'premium', emoji: '🏎️' },
+
+  // === Supercars ===
+  { id: 'ferrari-296', brand: 'Ferrari', model: '296 GTB', year: 2024, price: 320000, hp: 830, category: 'Supersportwagen', tier: 'super', emoji: '🏎️' },
+  { id: 'ferrari-roma', brand: 'Ferrari', model: 'Roma', year: 2024, price: 230000, hp: 620, category: 'GT', tier: 'super', emoji: '🏎️' },
+  { id: 'ferrari-sf90', brand: 'Ferrari', model: 'SF90 Stradale', year: 2024, price: 470000, hp: 1000, category: 'Hybrid-Hyper', tier: 'super', emoji: '🏎️' },
+  { id: 'ferrari-purosangue', brand: 'Ferrari', model: 'Purosangue', year: 2024, price: 390000, hp: 725, category: 'SUV', tier: 'super', emoji: '🚙' },
+  { id: 'ferrari-12cilindri', brand: 'Ferrari', model: '12Cilindri', year: 2025, price: 395000, hp: 830, category: 'GT', tier: 'super', emoji: '🏎️' },
+  { id: 'lambo-huracan-sterrato', brand: 'Lamborghini', model: 'Huracán Sterrato', year: 2024, price: 285000, hp: 610, category: 'Supersportwagen', tier: 'super', emoji: '🏎️' },
+  { id: 'lambo-revuelto', brand: 'Lamborghini', model: 'Revuelto', year: 2024, price: 510000, hp: 1015, category: 'Hybrid-Hyper', tier: 'super', emoji: '🏎️' },
+  { id: 'lambo-urus-sse', brand: 'Lamborghini', model: 'Urus SE', year: 2024, price: 240000, hp: 800, category: 'SUV', tier: 'super', emoji: '🚙' },
+  { id: 'mclaren-artura', brand: 'McLaren', model: 'Artura', year: 2024, price: 245000, hp: 700, category: 'Supersportwagen', tier: 'super', emoji: '🏎️' },
+  { id: 'mclaren-750s', brand: 'McLaren', model: '750S', year: 2024, price: 340000, hp: 750, category: 'Supersportwagen', tier: 'super', emoji: '🏎️' },
+  { id: 'mclaren-gts', brand: 'McLaren', model: 'GTS', year: 2024, price: 245000, hp: 635, category: 'GT', tier: 'super', emoji: '🏎️' },
+  { id: 'astonmartin-vantage', brand: 'Aston Martin', model: 'Vantage', year: 2024, price: 195000, hp: 665, category: 'Sportwagen', tier: 'super', emoji: '🏎️' },
+  { id: 'astonmartin-db12', brand: 'Aston Martin', model: 'DB12', year: 2024, price: 250000, hp: 680, category: 'GT', tier: 'super', emoji: '🏎️' },
+  { id: 'astonmartin-dbx707', brand: 'Aston Martin', model: 'DBX 707', year: 2024, price: 250000, hp: 707, category: 'SUV', tier: 'super', emoji: '🚙' },
+  { id: 'corvette-z06', brand: 'Chevrolet', model: 'Corvette Z06', year: 2024, price: 145000, hp: 670, category: 'Supersportwagen', tier: 'premium', emoji: '🏎️' },
+  { id: 'corvette-eray', brand: 'Chevrolet', model: 'Corvette E-Ray', year: 2024, price: 130000, hp: 655, category: 'Hybrid', tier: 'premium', emoji: '🏎️' },
+  { id: 'nissan-gtr-nismo', brand: 'Nissan', model: 'GT-R Nismo', year: 2023, price: 230000, hp: 600, category: 'Supersportwagen', tier: 'super', emoji: '🏎️' },
+  { id: 'audi-r8-gt', brand: 'Audi', model: 'R8 V10 GT', year: 2023, price: 260000, hp: 620, category: 'Supersportwagen', tier: 'super', emoji: '🏎️' },
+
+  // === Hypercars ===
+  { id: 'bugatti-chiron-ss', brand: 'Bugatti', model: 'Chiron Super Sport 300+', year: 2021, price: 3900000, hp: 1600, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'bugatti-tourbillon', brand: 'Bugatti', model: 'Tourbillon', year: 2026, price: 3800000, hp: 1800, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'bugatti-mistral', brand: 'Bugatti', model: 'W16 Mistral', year: 2024, price: 5000000, hp: 1600, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'koenigsegg-jesko', brand: 'Koenigsegg', model: 'Jesko Absolut', year: 2024, price: 3000000, hp: 1600, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'koenigsegg-gemera', brand: 'Koenigsegg', model: 'Gemera', year: 2024, price: 1700000, hp: 2300, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'pagani-utopia', brand: 'Pagani', model: 'Utopia', year: 2024, price: 2500000, hp: 864, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'pagani-huayra-r', brand: 'Pagani', model: 'Huayra R', year: 2023, price: 3000000, hp: 850, category: 'Track-Hyper', tier: 'hyper', emoji: '👑' },
+  { id: 'rimac-nevera', brand: 'Rimac', model: 'Nevera', year: 2024, price: 2200000, hp: 1914, category: 'Elektro-Hyper', tier: 'hyper', emoji: '⚡' },
+  { id: 'lotus-evija', brand: 'Lotus', model: 'Evija', year: 2024, price: 2500000, hp: 2011, category: 'Elektro-Hyper', tier: 'hyper', emoji: '⚡' },
+  { id: 'mclaren-w1', brand: 'McLaren', model: 'W1', year: 2026, price: 2200000, hp: 1275, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'amg-one', brand: 'Mercedes-AMG', model: 'ONE', year: 2023, price: 2750000, hp: 1063, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'astonmartin-valkyrie', brand: 'Aston Martin', model: 'Valkyrie', year: 2023, price: 3500000, hp: 1160, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'astonmartin-valhalla', brand: 'Aston Martin', model: 'Valhalla', year: 2025, price: 850000, hp: 1079, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'gordon-murray-t50', brand: 'Gordon Murray', model: 'T.50', year: 2024, price: 2800000, hp: 663, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'czinger-21c', brand: 'Czinger', model: '21C', year: 2024, price: 2000000, hp: 1250, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'ferrari-laferrari', brand: 'Ferrari', model: 'LaFerrari', year: 2015, price: 1400000, hp: 963, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'porsche-918', brand: 'Porsche', model: '918 Spyder', year: 2015, price: 850000, hp: 887, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+  { id: 'mclaren-p1', brand: 'McLaren', model: 'P1', year: 2015, price: 1150000, hp: 916, category: 'Hypercar', tier: 'hyper', emoji: '👑' },
+
+  // === Luxury / Limousinen ===
+  { id: 'rr-spectre', brand: 'Rolls-Royce', model: 'Spectre', year: 2024, price: 415000, hp: 585, category: 'Luxus-Coupé', tier: 'super', emoji: '👑' },
+  { id: 'rr-ghost', brand: 'Rolls-Royce', model: 'Ghost', year: 2024, price: 350000, hp: 571, category: 'Luxus-Limousine', tier: 'super', emoji: '👑' },
+  { id: 'rr-phantom', brand: 'Rolls-Royce', model: 'Phantom EWB', year: 2024, price: 600000, hp: 571, category: 'Luxus-Limousine', tier: 'super', emoji: '👑' },
+  { id: 'rr-cullinan', brand: 'Rolls-Royce', model: 'Cullinan Series II', year: 2024, price: 410000, hp: 571, category: 'Luxus-SUV', tier: 'super', emoji: '👑' },
+  { id: 'bentley-flying-spur', brand: 'Bentley', model: 'Flying Spur Speed', year: 2024, price: 280000, hp: 635, category: 'Luxus-Limousine', tier: 'super', emoji: '👑' },
+  { id: 'bentley-bentayga', brand: 'Bentley', model: 'Bentayga EWB', year: 2024, price: 240000, hp: 550, category: 'Luxus-SUV', tier: 'super', emoji: '🚙' },
+  { id: 'bentley-batur', brand: 'Bentley Mulliner', model: 'Batur', year: 2024, price: 1900000, hp: 740, category: 'Luxus-Coupé', tier: 'hyper', emoji: '👑' },
+  { id: 'mb-maybach-s680', brand: 'Mercedes-Maybach', model: 'S 680', year: 2024, price: 235000, hp: 612, category: 'Luxus-Limousine', tier: 'super', emoji: '👑' },
+  { id: 'mb-g63', brand: 'Mercedes-AMG', model: 'G 63', year: 2024, price: 215000, hp: 585, category: 'SUV', tier: 'premium', emoji: '🚙' },
+  { id: 'mb-g63-4x4-2', brand: 'Mercedes-AMG', model: 'G 63 4x4²', year: 2024, price: 470000, hp: 585, category: 'SUV', tier: 'super', emoji: '🚙' },
+  { id: 'lucid-air', brand: 'Lucid', model: 'Air Sapphire', year: 2024, price: 250000, hp: 1234, category: 'Elektro', tier: 'super', emoji: '⚡' },
+
+  // === Klassiker / Sammlerstücke ===
+  { id: 'ferrari-250-gto', brand: 'Ferrari', model: '250 GTO', year: 1962, price: 70000000, hp: 300, category: 'Klassiker', tier: 'hyper', emoji: '🏛️' },
+  { id: 'mb-300sl-uhlenhaut', brand: 'Mercedes-Benz', model: '300 SLR Uhlenhaut', year: 1955, price: 135000000, hp: 310, category: 'Klassiker', tier: 'hyper', emoji: '🏛️' },
+  { id: 'mb-300sl-gull', brand: 'Mercedes-Benz', model: '300 SL Gullwing', year: 1955, price: 1500000, hp: 215, category: 'Klassiker', tier: 'super', emoji: '🏛️' },
+  { id: 'porsche-959', brand: 'Porsche', model: '959', year: 1988, price: 1500000, hp: 450, category: 'Klassiker', tier: 'super', emoji: '🏛️' },
+  { id: 'porsche-carrera-gt', brand: 'Porsche', model: 'Carrera GT', year: 2005, price: 1800000, hp: 612, category: 'Klassiker', tier: 'hyper', emoji: '🏛️' },
+  { id: 'ferrari-f40', brand: 'Ferrari', model: 'F40', year: 1989, price: 2500000, hp: 478, category: 'Klassiker', tier: 'hyper', emoji: '🏛️' },
+  { id: 'ferrari-enzo', brand: 'Ferrari', model: 'Enzo', year: 2003, price: 3500000, hp: 660, category: 'Klassiker', tier: 'hyper', emoji: '🏛️' },
+  { id: 'mclaren-f1', brand: 'McLaren', model: 'F1', year: 1995, price: 20000000, hp: 627, category: 'Klassiker', tier: 'hyper', emoji: '🏛️' },
+  { id: 'jaguar-xj220', brand: 'Jaguar', model: 'XJ220', year: 1993, price: 600000, hp: 542, category: 'Klassiker', tier: 'super', emoji: '🏛️' },
+  { id: 'lambo-countach', brand: 'Lamborghini', model: 'Countach LP400', year: 1976, price: 700000, hp: 375, category: 'Klassiker', tier: 'super', emoji: '🏛️' },
+  { id: 'bmw-m1', brand: 'BMW', model: 'M1', year: 1981, price: 700000, hp: 277, category: 'Klassiker', tier: 'super', emoji: '🏛️' },
+
+  // === Kuriositäten / One-Offs ===
+  { id: 'rr-boattail', brand: 'Rolls-Royce', model: 'Boat Tail', year: 2022, price: 28000000, hp: 593, category: 'Coachbuilt', tier: 'hyper', emoji: '👑' },
+  { id: 'bugatti-divo', brand: 'Bugatti', model: 'Divo', year: 2020, price: 5000000, hp: 1500, category: 'Coachbuilt', tier: 'hyper', emoji: '👑' },
+  { id: 'bugatti-centodieci', brand: 'Bugatti', model: 'Centodieci', year: 2022, price: 8000000, hp: 1600, category: 'Coachbuilt', tier: 'hyper', emoji: '👑' },
+  { id: 'bugatti-la-voiture-noire', brand: 'Bugatti', model: 'La Voiture Noire', year: 2021, price: 16700000, hp: 1500, category: 'One-Off', tier: 'hyper', emoji: '👑' },
+  { id: 'pagani-zonda-hp', brand: 'Pagani', model: 'Zonda HP Barchetta', year: 2018, price: 17500000, hp: 800, category: 'One-Off', tier: 'hyper', emoji: '👑' },
+  { id: 'mb-vision', brand: 'Mercedes-Benz', model: 'Vision One-Eleven', year: 2024, price: 1800000, hp: 800, category: 'Concept', tier: 'hyper', emoji: '👑' },
+  { id: 'aston-vulcan', brand: 'Aston Martin', model: 'Vulcan', year: 2016, price: 2300000, hp: 820, category: 'Track-Hyper', tier: 'hyper', emoji: '👑' },
+  { id: 'ferrari-fxx-k', brand: 'Ferrari', model: 'FXX-K Evo', year: 2018, price: 4500000, hp: 1050, category: 'Track-Hyper', tier: 'hyper', emoji: '👑' },
+];
+
+export const TIERS_BY_DIFFICULTY = {
+  // easy: include mainstream so the spread is wider and easier to gauge
+  easy: ['mainstream', 'premium', 'super', 'hyper'],
+  normal: ['premium', 'super', 'hyper'],
+  hard: ['super', 'hyper'],
+};
