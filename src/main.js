@@ -463,6 +463,9 @@ function flowJoinRoom(name) {
   const go = async () => {
     const code = input.value.trim().toUpperCase();
     if (code.length < 4) { toast('Code unvollständig'); return; }
+    const goBtn = $('#room-go');
+    goBtn.disabled = true;
+    goBtn.textContent = 'Verbinde…';
     setStatus(`Verbinde mit Raum ${code}…`);
     try {
       const peer = await joinHost(code, {
@@ -480,6 +483,8 @@ function flowJoinRoom(name) {
       const role = $('#room-role'); role.className = 'mp-role'; role.textContent = '🎮 Spieler';
     } catch (e) {
       setStatus(e.message || 'Verbindung fehlgeschlagen', true);
+      goBtn.disabled = false;
+      goBtn.textContent = 'Beitreten';
     }
   };
   $('#room-go').addEventListener('click', go);

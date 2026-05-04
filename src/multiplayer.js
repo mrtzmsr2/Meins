@@ -28,8 +28,15 @@ export async function createHost(roomCode, { onPeerJoin, onPeerLeave, onMessage,
     const conns = new Map();
     let openResolved = false;
 
+    const timeout = setTimeout(() => {
+      if (openResolved) return;
+      try { peer.destroy(); } catch {}
+      reject(new Error('Zeitüberschreitung beim Verbinden zum Signaling-Server. Bitte erneut versuchen.'));
+    }, 15000);
+
     peer.on('open', () => {
       openResolved = true;
+      clearTimeout(timeout);
       resolve({
         peer, roomCode,
         broadcast(msg) { for (const { conn } of conns.values()) { try { conn.send(msg); } catch {} } },
@@ -60,8 +67,12 @@ export async function createHost(roomCode, { onPeerJoin, onPeerLeave, onMessage,
 
     peer.on('error', (err) => {
       if (!openResolved) {
+        clearTimeout(timeout);
+        try { peer.destroy(); } catch {}
         if (err && err.type === 'unavailable-id') reject(new Error('Raum-Code bereits vergeben. Bitte neuen Raum erstellen.'));
-        else reject(err);
+        else if (err && err.type === 'network') reject(new Error('Netzwerk-Fehler. Internetverbindung prüfen.'));
+        else if (err && err.type === 'server-error') reject(new Error('PeerJS-Server nicht erreichbar. Bitte erneut versuchen.'));
+        else reject(err instanceof Error ? err : new Error(err?.message || 'Verbindung fehlgeschlagen'));
       } else { onError?.(err); }
     });
   });
@@ -73,10 +84,26 @@ export async function joinHost(roomCode, { onMessage, onClose, onError, name } =
     const peer = new Peer(undefined, { debug: 1 });
     let settled = false;
 
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      try { peer.destroy(); } catch {}
+      reject(err);
+    };
+
+    // Hard timeout — if nothing happens in 15s, give up cleanly
+    const timeout = setTimeout(() => {
+      fail(new Error('Zeitüberschreitung beim Verbinden. Code prüfen oder erneut versuchen.'));
+    }, 15000);
+
     peer.on('open', () => {
       const conn = peer.connect(PREFIX + roomCode, { reliable: true });
+
+      // If conn never opens (e.g. host gone or NAT issue), keep timeout alive
       conn.on('open', () => {
+        if (settled) return;
         settled = true;
+        clearTimeout(timeout);
         try { conn.send({ type: 'name', name }); } catch {}
         resolve({
           peer, conn, roomCode,
@@ -85,15 +112,19 @@ export async function joinHost(roomCode, { onMessage, onClose, onError, name } =
         });
       });
       conn.on('data', (data) => onMessage?.(data));
-      conn.on('close', () => onClose?.());
-      conn.on('error', (err) => onError?.(err));
+      conn.on('close', () => { if (settled) onClose?.(); });
+      conn.on('error', (err) => {
+        if (!settled) fail(new Error('Raum nicht gefunden oder Verbindung gescheitert. Code prüfen.'));
+        else onError?.(err);
+      });
     });
 
     peer.on('error', (err) => {
-      if (!settled) {
-        if (err && err.type === 'peer-unavailable') reject(new Error('Raum nicht gefunden. Code prüfen.'));
-        else reject(err);
-      } else { onError?.(err); }
+      if (settled) { onError?.(err); return; }
+      if (err && err.type === 'peer-unavailable') fail(new Error('Raum nicht gefunden. Code prüfen.'));
+      else if (err && err.type === 'network') fail(new Error('Netzwerk-Fehler. Internetverbindung prüfen.'));
+      else if (err && err.type === 'server-error') fail(new Error('PeerJS-Server nicht erreichbar. Bitte erneut versuchen.'));
+      else fail(err instanceof Error ? err : new Error(err?.message || 'Verbindung fehlgeschlagen'));
     });
   });
 }
