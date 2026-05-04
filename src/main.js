@@ -36,16 +36,16 @@ function renderSettingsBlock(host) {
 
   host.innerHTML = `
     <div class="settings-title">Spiel-Einstellungen</div>
-    <div class="settings-row">
-      <div>
-        <label>Anzahl Slots pro Spieler</label>
-        <span class="hint">Wie viele Autos jeder Spieler einträgt</span>
-      </div>
-      <div class="stepper" data-key="slot">
-        <button type="button" data-step="-1" aria-label="weniger">−</button>
+    <div class="settings-slider">
+      <div class="settings-slider-head">
+        <div>
+          <label for="set-slot-range">Anzahl Slots pro Spieler</label>
+          <span class="hint">Wie viele Autos jeder Spieler einträgt</span>
+        </div>
         <div class="value" id="set-slot-val">${slotCount}</div>
-        <button type="button" data-step="1" aria-label="mehr">+</button>
       </div>
+      <input type="range" id="set-slot-range" class="slider"
+             min="${MIN_SLOT_COUNT}" max="${MAX_SLOT_COUNT}" step="1" value="${slotCount}" />
     </div>
     <div class="settings-slider">
       <div class="settings-slider-head">
@@ -61,28 +61,20 @@ function renderSettingsBlock(host) {
   `;
 
   const slotVal = $('#set-slot-val', host);
+  const slotRange = $('#set-slot-range', host);
   const coolVal = $('#set-cool-val', host);
   const coolRange = $('#set-cool-range', host);
-  const updateDisabled = () => {
-    host.querySelectorAll('.stepper[data-key="slot"] button').forEach(b => {
-      const step = parseInt(b.dataset.step, 10);
-      b.disabled = (step < 0 && slotCount <= MIN_SLOT_COUNT) || (step > 0 && slotCount >= MAX_SLOT_COUNT);
-    });
-  };
-  host.querySelectorAll('.stepper[data-key="slot"] button').forEach(b => {
-    b.addEventListener('click', () => {
-      slotCount = clampSlotCount(slotCount + parseInt(b.dataset.step, 10));
-      slotVal.textContent = slotCount;
-      store.setSettings({ slotCount });
-      updateDisabled();
-    });
+
+  slotRange.addEventListener('input', () => {
+    slotCount = clampSlotCount(slotRange.value);
+    slotVal.textContent = slotCount;
+    store.setSettings({ slotCount });
   });
   coolRange.addEventListener('input', () => {
     cooldownSec = clampCooldownSec(coolRange.value);
     coolVal.textContent = `${cooldownSec}s`;
     store.setSettings({ cooldownSec });
   });
-  updateDisabled();
 
   return { get values() { return { slotCount, cooldownSec }; } };
 }
