@@ -71,11 +71,23 @@
 
       <!-- Multi-device setup -->
       <div class="setup-pane" id="setup-multi" hidden>
-        <div class="setup-hint">Ein Spieler erstellt einen Raum, die anderen treten mit dem Code bei.</div>
+        <div class="setup-hint">Jeder Spieler ist auf seinem eigenen Handy. Ein Spieler eröffnet das Spiel, alle anderen treten mit einem 4-stelligen Code bei.</div>
         <input class="text-input" id="multi-name" type="text" placeholder="Dein Name" maxlength="20" autocomplete="off" />
-        <div class="multi-actions">
-          <button class="primary" id="multi-create">👑 Raum erstellen</button>
-          <button class="secondary" id="multi-join">🚪 Raum beitreten</button>
+        <div class="role-cards">
+          <button type="button" class="role-card" id="multi-create">
+            <div class="role-card-icon">👑</div>
+            <div class="role-card-body">
+              <div class="role-card-title">Ich bin der Erste</div>
+              <div class="role-card-desc">Raum eröffnen und Code an die anderen weitergeben. Du bist Rundenmeister.</div>
+            </div>
+          </button>
+          <button type="button" class="role-card" id="multi-join">
+            <div class="role-card-icon">🚪</div>
+            <div class="role-card-body">
+              <div class="role-card-title">Ich habe einen Code</div>
+              <div class="role-card-desc">Raum-Code eingeben und einem Spiel beitreten.</div>
+            </div>
+          </button>
         </div>
       </div>
     </section>
