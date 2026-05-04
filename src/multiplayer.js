@@ -1,10 +1,5 @@
-// Multiplayer transport using PeerJS (WebRTC peer-to-peer).
-// Architecture:
-//  - Host owns the authoritative game state and broadcasts via DataConnections.
-//  - Peers send their actions (guess, duelPick, name) to the host only.
-// PeerJS is loaded globally via <script> in index.html (window.Peer).
-
-const PREFIX = 'mmeins-v3-';
+// PeerJS-based transport. Host owns authoritative state.
+const PREFIX = 'meins-v4-';
 const ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 
 export function makeRoomCode() {
@@ -19,36 +14,27 @@ function ensurePeer() {
     const t0 = Date.now();
     const iv = setInterval(() => {
       if (window.Peer) { clearInterval(iv); resolve(window.Peer); }
-      else if (Date.now() - t0 > 10000) { clearInterval(iv); reject(new Error('PeerJS konnte nicht geladen werden.')); }
+      else if (Date.now() - t0 > 10000) {
+        clearInterval(iv); reject(new Error('PeerJS konnte nicht geladen werden. Bitte Internetverbindung prüfen.'));
+      }
     }, 50);
   });
 }
 
-/** Host: creates a peer with a deterministic ID derived from the room code. */
 export async function createHost(roomCode, { onPeerJoin, onPeerLeave, onMessage, onError } = {}) {
   const Peer = await ensurePeer();
   return new Promise((resolve, reject) => {
     const peer = new Peer(PREFIX + roomCode, { debug: 1 });
-    const conns = new Map(); // peerId -> { conn, name }
+    const conns = new Map();
+    let openResolved = false;
 
     peer.on('open', () => {
+      openResolved = true;
       resolve({
-        peer,
-        roomCode,
-        broadcast(msg) {
-          for (const { conn } of conns.values()) {
-            try { conn.send(msg); } catch {}
-          }
-        },
-        sendTo(peerId, msg) {
-          const c = conns.get(peerId);
-          if (c) { try { c.conn.send(msg); } catch {} }
-        },
+        peer, roomCode,
+        broadcast(msg) { for (const { conn } of conns.values()) { try { conn.send(msg); } catch {} } },
+        sendTo(peerId, msg) { const c = conns.get(peerId); if (c) try { c.conn.send(msg); } catch {} },
         listPeers() { return Array.from(conns.entries()).map(([id, v]) => ({ id, name: v.name })); },
-        kick(peerId) {
-          const c = conns.get(peerId);
-          if (c) { try { c.conn.close(); } catch {} conns.delete(peerId); }
-        },
         destroy() {
           for (const { conn } of conns.values()) { try { conn.close(); } catch {} }
           try { peer.destroy(); } catch {}
@@ -64,28 +50,23 @@ export async function createHost(roomCode, { onPeerJoin, onPeerLeave, onMessage,
       conn.on('data', (data) => {
         if (!data || typeof data !== 'object') return;
         if (data.type === 'name' && typeof data.name === 'string') {
-          const entry = conns.get(conn.peer);
-          if (entry) entry.name = data.name.slice(0, 20);
+          const e = conns.get(conn.peer); if (e) e.name = data.name.slice(0, 20);
         }
         onMessage?.(conn.peer, data);
       });
-      conn.on('close', () => {
-        conns.delete(conn.peer);
-        onPeerLeave?.(conn.peer);
-      });
+      conn.on('close', () => { conns.delete(conn.peer); onPeerLeave?.(conn.peer); });
       conn.on('error', (err) => onError?.(err));
     });
 
     peer.on('error', (err) => {
-      // unavailable-id means room already exists
-      if (err && err.type === 'unavailable-id') reject(new Error('Raum-Code bereits vergeben. Bitte neuen Raum erstellen.'));
-      else if (!conns.size) reject(err);
-      else onError?.(err);
+      if (!openResolved) {
+        if (err && err.type === 'unavailable-id') reject(new Error('Raum-Code bereits vergeben. Bitte neuen Raum erstellen.'));
+        else reject(err);
+      } else { onError?.(err); }
     });
   });
 }
 
-/** Peer: connects to host by room code. */
 export async function joinHost(roomCode, { onMessage, onClose, onError, name } = {}) {
   const Peer = await ensurePeer();
   return new Promise((resolve, reject) => {
@@ -112,9 +93,7 @@ export async function joinHost(roomCode, { onMessage, onClose, onError, name } =
       if (!settled) {
         if (err && err.type === 'peer-unavailable') reject(new Error('Raum nicht gefunden. Code prüfen.'));
         else reject(err);
-      } else {
-        onError?.(err);
-      }
+      } else { onError?.(err); }
     });
   });
 }

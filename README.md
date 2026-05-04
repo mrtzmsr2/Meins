@@ -1,89 +1,62 @@
-# MMEINS! v3 — Wer kennt die teuersten Autos?
+# MEINS! 🏎️
 
-Nachfolger von [meiner.netlify.app](https://meiner.netlify.app/). Komplett neu aufgebaut, ohne Build-Schritt: einfach hosten oder lokal öffnen.
+Das klassische Autospiel als Web-App. Wer zuerst „**Meins!**" ruft, sichert sich das vorbeifahrende Auto. Jeder Spieler hat **3 Slots**. Wenn alle voll sind, gewinnt die teuerste Sammlung.
 
-## Features
+**Repo:** <https://github.com/mrtzmsr2/Meins>
 
-- **5 Spielmodi**
-  - 🏁 Klassisch — 10 Runden, Punkte je nach Genauigkeit
-  - ⏱️ Zeitrennen — 60 s, so viele Treffer wie möglich
-  - 🔥 Streak — 3 Fehler = Game Over
-  - ⚔️ Duell — Welches Auto ist teurer?
-  - 📱 **Multiplayer** — mehrere Handys in einer Sitzung, ein Rundenmeister steuert
-- **3 Schwierigkeitsgrade** (Easy / Normal / Hard) — filtert die Auto-Datenbank nach Preis-Tier
-- **Highscore-Bestenliste** je Spielmodus (Top 10, lokal gespeichert)
-- **Stats** — Spiele, Punkte, Trefferquote, Volltreffer
-- **Mobile-first**, modernes Dark-UI mit Verlauf, Slider mit logarithmischer Skala (für Preise von 10.000 € bis 100 Mio. €)
-- **~85 kuratierte Autos** quer durch alle Klassen (Mainstream → Hypercar → Klassiker)
-- **Keine Build-Tools** — reine ES-Module + PeerJS via CDN
+## So funktioniert's
 
-## Multiplayer
+1. **Neues Spiel** → Spielmodus wählen:
+   - **📱 Ein Gerät** — alle Spieler sehen dasselbe Display, jeder klickt seine Slots
+   - **📡 Mehrere Geräte** — ein Spieler erstellt einen Raum, die anderen treten mit dem 4-stelligen Code bei (oder per geteiltem Link)
+2. Auto fährt vorbei → laut **„Meins!"** rufen.
+3. Wer zuerst war, tippt einen freien Slot an → **Marke + Modell** eingeben → Preis wird automatisch gesucht (oder manuell eintragen).
+4. Wenn alle 3 × N Slots voll sind: **Auswertung** mit Ranking und Gewinner-Banner.
+5. „Nochmal" startet sofort eine neue Runde mit derselben Gruppe.
 
-- **Wie es funktioniert:** Ein Spieler tippt auf „Multiplayer → Raum erstellen" und wird Rundenmeister. Die anderen öffnen die Seite und tippen auf „Raum beitreten" → 4-stelligen Code eingeben (oder Link `?room=ABCD` öffnen).
-- **Rollen:** Der **Rundenmeister** wählt Modus (Klassisch oder Duell), startet das Spiel, deckt Runden auf und schaltet weiter. Alle anderen sehen das Auto und geben ihren Tipp ab.
-- **Technik:** WebRTC peer-to-peer über [PeerJS](https://peerjs.com/) — kein eigener Server, kein Backend. Funktioniert also direkt auf Netlify.
-- **Voraussetzung:** Alle Geräte brauchen Internet. Das öffentliche PeerJS-Cloud-Signaling (kostenfrei) wird zum initialen Verbindungsaufbau genutzt.
+## Cross-Plattform (iPhone, Android, Desktop)
 
+Die App ist eine reine **Web-App** — läuft im Browser auf jedem Gerät. Multiplayer nutzt **WebRTC peer-to-peer** über [PeerJS](https://peerjs.com/). Kein eigener Server nötig, keine Anmeldung, kein App-Store.
 
-## Lokal öffnen
+> **Tipp:** Auf dem Handy im Browser auf „Zum Home-Bildschirm hinzufügen" → wirkt wie eine native App.
 
-Browser-Sicherheit blockiert ES-Module über `file://`. Daher einen kleinen lokalen Server starten:
+## Auto-Datenbank
+
+- ~200 vorgepflegte Modelle vom Dacia Sandero bis zur Bugatti Tourbillon
+- **Autocomplete** beim Tippen (Marke + Modell)
+- **Manuelle Eingabe** für alles, was nicht in der Liste ist — wird lokal gespeichert und erscheint beim nächsten Mal in der Suche
+- Datei: [src/data/cars.js](src/data/cars.js) — Erweitern ist trivial:
+  ```js
+  { brand: 'Marke', model: 'Modell', price: 12345, emoji: '🚗' }
+  ```
+
+## Technik
+
+- **Vanilla HTML / CSS / ES-Module** — kein Build-Schritt, kein Node erforderlich
+- **PeerJS** über CDN — WebRTC-Signaling kostenlos
+- **Mobile-first**, modernes Dark-UI
+- **localStorage** für letzte Gruppe + selbst eingetragene Autos
+
+## Lokal entwickeln
+
+ES-Module brauchen einen lokalen Server:
 
 ```powershell
-# Variante 1: Python (falls installiert)
+# Variante A – Python
 python -m http.server 8080
 
-# Variante 2: VS Code Live Server Extension → "Open with Live Server"
+# Variante B – VS Code Live-Server-Extension
 ```
 
-Dann <http://localhost:8080> öffnen.
+Dann <http://localhost:8080> öffnen. Für Multi-Device-Tests im selben WLAN: PC-IP statt `localhost`.
 
-## Auf Netlify deployen
+## Deployment (Netlify)
 
-Drag & Drop des Projektordners auf <https://app.netlify.com/drop> – fertig. Es ist kein Build nötig (`netlify.toml` enthält nur das Publish-Verzeichnis).
+1. <https://app.netlify.com> → "Add new site" → "Import an existing project" → GitHub → Repo `mrtzmsr2/Meins`
+2. Build command: leer · Publish directory: `.` → Deploy
+3. Site settings → Change site name → permanente URL wählen
 
-## GitHub-Setup & Continuous Deployment
-
-```powershell
-# 1) Bei GitHub ein leeres Repo erstellen (z. B. mmeins-v3) – ohne README/.gitignore
-# 2) Hier im Projekt:
-git init
-git add -A
-git commit -m "feat: MMEINS v3 – multiplayer car price game"
-git branch -M main
-git remote add origin https://github.com/<dein-user>/mmeins-v3.git
-git push -u origin main
-```
-
-**Auto-Deploy auf Netlify einrichten (einmalig):**
-
-1. Netlify → "Add new site" → "Import an existing project" → GitHub → das Repo auswählen.
-2. Build command leer lassen, Publish directory `.` (Punkt). → Deploy.
-3. Site-Name unter „Site settings" auf z. B. `mmeins` setzen → URL `https://mmeins.netlify.app`.
-
-Danach: jeder `git push origin main` löst automatisch ein neues Deploy aus.
-
-**Optional – GitHub Actions statt Netlify-Git-Integration:** Workflow liegt schon unter [.github/workflows/deploy.yml](.github/workflows/deploy.yml). In den Repo-Secrets nur setzen: `NETLIFY_AUTH_TOKEN` (User → Applications → Personal access tokens) und `NETLIFY_SITE_ID` (Site settings → General → Site ID).
-
-## Auto-Datenbank pflegen
-
-Datei: `src/data/cars.js`. Jeder Eintrag:
-
-```js
-{
-  id: 'eindeutig',
-  brand: 'Ferrari',
-  model: 'F40',
-  year: 1989,
-  price: 2_500_000,    // EUR
-  hp: 478,
-  category: 'Klassiker',
-  tier: 'hyper',       // 'mainstream' | 'premium' | 'super' | 'hyper'
-  emoji: '🏛️',
-}
-```
-
-`tier` steuert, in welchen Schwierigkeitsgraden das Auto auftaucht.
+Jeder `git push origin main` deployt danach automatisch.
 
 ## Projektstruktur
 
@@ -92,9 +65,15 @@ index.html
 styles.css
 netlify.toml
 src/
-  main.js          # Views, Routing, Game-Engine
-  store.js         # localStorage (Stats + Bestenliste)
-  util.js          # Score-Modell, Formatter, Skalen
-  data/
-    cars.js        # Auto-Datenbank
+  main.js            # Routing + Views (Home, Setup, Game, Summary, Room)
+  game.js            # Spielzustand: Spieler, Slots, Ranking
+  car-search.js      # Auto-Such-Modal (Autocomplete + manuell)
+  multiplayer.js     # PeerJS-Wrapper (Host & Peer)
+  store.js           # localStorage (letzte Gruppe, eigene Autos)
+  util.js            # fmtEUR, escapeHtml, etc.
+  data/cars.js       # Auto-Datenbank
 ```
+
+## Lizenz
+
+MIT — siehe [LICENSE](LICENSE).

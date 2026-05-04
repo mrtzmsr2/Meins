@@ -1,478 +1,548 @@
-// MMEINS v3 main entry — wires up views, modes, modals.
-import { CARS, TIERS_BY_DIFFICULTY } from './data/cars.js';
+// MEINS! v4 — main entry, routing, all views.
+import { fmtEUR, fmtNum, escapeHtml, randomId } from './util.js';
 import { store } from './store.js';
+import { createHost, joinHost, makeRoomCode } from './multiplayer.js';
 import {
-  fmtEUR, fmtNum, pickRandom, scoreGuess, ratingFor,
-  logScale, logScaleInverse, clamp, relTime,
-} from './util.js';
-import { openMultiplayer } from './multiplayer-view.js';
+  newGame, newGameFromPlayers, setSlot, ranking, progress, totalForPlayer,
+  SLOT_COUNT,
+} from './game.js';
+import { openCarSearch } from './car-search.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 const tpl = (id) => document.getElementById(id).content.cloneNode(true);
 const app = $('#app');
 
-// ---------- helpers ----------
-function carPool(difficulty) {
-  const tiers = new Set(TIERS_BY_DIFFICULTY[difficulty] || TIERS_BY_DIFFICULTY.normal);
-  return CARS.filter(c => tiers.has(c.tier));
-}
+let mp = null;       // current multiplayer session (host or peer)
+let game = null;     // current game state (single device only — multi state lives on host)
+let lastGame = null; // for "rematch" with same group
 
-function renderCarCard(car) {
-  const node = tpl('tpl-card');
-  $('[data-name]', node).textContent = `${car.brand} ${car.model}`;
-  $('[data-img]', node).textContent = car.emoji;
-  const tags = $('[data-tags]', node);
-  [
-    car.year, car.category, `${fmtNum(car.hp)} PS`,
-  ].forEach(t => {
-    const s = document.createElement('span'); s.className = 'tag'; s.textContent = t; tags.appendChild(s);
-  });
-  return node.firstElementChild;
-}
-
-function toast(msg) {
+function toast(msg, ms = 1800) {
   const el = document.createElement('div');
   el.className = 'toast'; el.textContent = msg;
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1800);
+  setTimeout(() => el.remove(), ms);
 }
 
-function openModal(title, bodyEl) {
-  const root = $('#modal-root');
-  root.hidden = false;
-  root.innerHTML = '';
-  const backdrop = document.createElement('div');
-  backdrop.className = 'modal-backdrop';
-  const modal = document.createElement('div');
-  modal.className = 'modal';
-  modal.innerHTML = `<button class="icon-btn modal-close" aria-label="Schließen">✕</button><h2></h2>`;
-  $('h2', modal).textContent = title;
-  modal.appendChild(bodyEl);
-  root.append(backdrop, modal);
-  const close = () => { root.hidden = true; root.innerHTML = ''; };
-  backdrop.addEventListener('click', close);
-  $('.modal-close', modal).addEventListener('click', close);
-  document.addEventListener('keydown', function esc(e) {
-    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
-  });
-}
-
-// ---------- HOME ----------
+// ============================================================
+// HOME
+// ============================================================
 function renderHome() {
+  cleanupSession();
   app.innerHTML = '';
-  const node = tpl('tpl-home');
-  app.appendChild(node);
+  app.appendChild(tpl('tpl-home'));
 
-  // Stats strip
-  const stats = store.getStats();
-  const strip = $('#home-stats');
-  const accuracy = stats.totalGuesses ? Math.round((stats.perfectGuesses / stats.totalGuesses) * 100) : 0;
-  const items = [
-    { k: 'Spiele', v: fmtNum(stats.games) },
-    { k: 'Gesamt-Punkte', v: fmtNum(stats.totalScore) },
-    { k: 'Beste Runde', v: fmtNum(stats.bestRound) },
-    { k: 'Volltreffer', v: `${accuracy}%` },
-  ];
-  items.forEach(it => {
-    const el = document.createElement('div');
-    el.className = 'stat-pill';
-    el.innerHTML = `<div class="v">${it.v}</div><div class="k">${it.k}</div>`;
-    strip.appendChild(el);
+  const last = store.getLastGroup();
+  if (last && last.players?.length >= 2) {
+    const btn = $('#btn-rematch');
+    btn.hidden = false;
+    btn.textContent = `↻ Letzte Gruppe (${last.players.map(p => p.name).join(', ')})`;
+    btn.addEventListener('click', () => {
+      // Rematch always single-device — multi-device groups need a fresh room
+      startSingleGame(last.players.map(p => p.name));
+    });
+  }
+
+  $('#btn-new-game').addEventListener('click', renderSetup);
+}
+
+// ============================================================
+// SETUP
+// ============================================================
+function renderSetup() {
+  app.innerHTML = '';
+  app.appendChild(tpl('tpl-setup'));
+  $('#setup-back').addEventListener('click', renderHome);
+
+  const seg = $('#setup-mode-seg');
+  const single = $('#setup-single');
+  const multi = $('#setup-multi');
+
+  $$('button', seg).forEach(b => {
+    b.addEventListener('click', () => {
+      $$('button', seg).forEach(x => x.classList.toggle('active', x === b));
+      const mode = b.dataset.setupMode;
+      single.hidden = mode !== 'single';
+      multi.hidden = mode !== 'multi';
+    });
   });
 
-  // Difficulty
-  const settings = store.getSettings();
-  const seg = $('#difficulty-seg');
-  $$('button', seg).forEach(b => {
-    b.classList.toggle('active', b.dataset.diff === settings.difficulty);
-    b.setAttribute('aria-selected', b.dataset.diff === settings.difficulty ? 'true' : 'false');
-    b.addEventListener('click', () => {
-      store.setSettings({ difficulty: b.dataset.diff });
-      $$('button', seg).forEach(x => {
-        x.classList.toggle('active', x === b);
-        x.setAttribute('aria-selected', x === b ? 'true' : 'false');
+  // Single-device setup
+  const players = []; // [{ name }]
+  const list = $('#single-players');
+  const startBtn = $('#single-start');
+  const nameInput = $('#single-name');
+  const refreshList = () => {
+    list.innerHTML = '';
+    players.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'player-row';
+      row.innerHTML = `
+        <div class="name">${escapeHtml(p.name)}</div>
+        <button class="remove" aria-label="Entfernen" data-i="${i}">✕</button>
+      `;
+      list.appendChild(row);
+    });
+    list.querySelectorAll('.remove').forEach(b => {
+      b.addEventListener('click', () => {
+        players.splice(parseInt(b.dataset.i, 10), 1); refreshList();
       });
     });
+    startBtn.disabled = players.length < 2;
+  };
+  $('#single-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = nameInput.value.trim();
+    if (!v) return;
+    if (players.some(p => p.name.toLowerCase() === v.toLowerCase())) {
+      toast('Name bereits vergeben'); return;
+    }
+    if (players.length >= 8) { toast('Maximal 8 Spieler'); return; }
+    players.push({ name: v.slice(0, 20) });
+    nameInput.value = '';
+    nameInput.focus();
+    refreshList();
   });
+  startBtn.addEventListener('click', () => startSingleGame(players.map(p => p.name)));
 
-  // Mode cards
-  $$('.mode-card', app).forEach(card => {
-    card.addEventListener('click', () => {
-      const mode = card.dataset.mode;
-      if (mode === 'multi') openMultiplayer(app, renderHome);
-      else startGame(mode);
-    });
+  // Multi-device setup
+  const myName = $('#multi-name');
+  myName.value = store.getSettings().name || '';
+  myName.addEventListener('change', () => store.setSettings({ name: myName.value.trim() }));
+
+  $('#multi-create').addEventListener('click', async () => {
+    const n = myName.value.trim();
+    if (!n) { myName.focus(); toast('Bitte deinen Namen eingeben'); return; }
+    store.setSettings({ name: n });
+    await flowCreateRoom(n);
+  });
+  $('#multi-join').addEventListener('click', () => {
+    const n = myName.value.trim();
+    if (!n) { myName.focus(); toast('Bitte deinen Namen eingeben'); return; }
+    store.setSettings({ name: n });
+    flowJoinRoom(n);
   });
 }
 
-// ---------- GAME ENGINE ----------
-function startGame(mode) {
-  const difficulty = store.getSettings().difficulty;
-  const pool = carPool(difficulty);
-  if (pool.length < 4) { toast('Datenbank zu klein'); return; }
+// ============================================================
+// SINGLE-DEVICE GAME
+// ============================================================
+function startSingleGame(names) {
+  if (names.length < 2) { toast('Mindestens 2 Spieler'); return; }
+  game = newGame('single', names);
+  store.setLastGroup({ mode: 'single', players: names.map(n => ({ name: n })) });
+  lastGame = { names: [...names] };
+  renderGame();
+}
 
+function renderGame() {
   app.innerHTML = '';
   app.appendChild(tpl('tpl-game'));
-
-  const state = {
-    mode, difficulty, pool,
-    used: new Set(),
-    round: 0,
-    maxRounds: mode === 'classic' ? 10 : Infinity,
-    score: 0,
-    streak: 0,
-    misses: 0,
-    bestRound: 0,
-    perfect: 0,
-    guesses: 0,
-    history: [],
-    timeLeft: mode === 'time' ? 60 : null,
-    timerId: null,
-  };
-
-  $('#btn-quit').addEventListener('click', () => {
-    if (confirm('Spiel abbrechen?')) endGame(state);
+  $('#game-leave').addEventListener('click', () => {
+    if (confirm('Spiel beenden?')) renderHome();
   });
+  refreshGameView();
+}
 
-  // HUD label per mode
-  const extraLabel = $('#hud-extra-label');
-  if (mode === 'time') extraLabel.textContent = 'Zeit';
-  else if (mode === 'streak') extraLabel.textContent = 'Leben';
-  else if (mode === 'duel') extraLabel.textContent = 'Streak';
-  else extraLabel.textContent = 'Streak';
+function refreshGameView() {
+  if (!game) return;
 
-  if (mode === 'time') {
-    state.timerId = setInterval(() => {
-      state.timeLeft -= 1;
-      $('#hud-extra-value').textContent = state.timeLeft;
-      if (state.timeLeft <= 0) endGame(state);
-    }, 1000);
+  const pr = progress(game);
+  $('#game-progress').textContent = `${pr.filled}/${pr.total}`;
+
+  // Leader hint
+  const sorted = ranking(game);
+  const leader = sorted[0];
+  $('#game-leader').innerHTML = leader && leader.total > 0
+    ? `Aktuell vorn: <strong>${escapeHtml(leader.name)}</strong> · ${fmtEUR(leader.total)}`
+    : '';
+
+  const grid = $('#players-grid');
+  grid.innerHTML = '';
+  game.players.forEach(p => grid.appendChild(buildPlayerCard(p)));
+
+  $('#game-tip').textContent = game.status === 'done'
+    ? 'Alle Slots voll — gleich kommt die Auswertung.'
+    : (game.mode === 'single'
+        ? 'Ruft "Meins!" → tippt den Slot des Spielers an, der zuerst war.'
+        : 'Ruft "Meins!" → tippt einen freien Slot bei dir, um dein Auto einzutragen.');
+
+  if (game.status === 'done') {
+    setTimeout(() => renderSummary(game), 500);
   }
-
-  nextRound(state);
 }
 
-function updateHud(state) {
-  $('#hud-round').textContent = state.maxRounds === Infinity ? state.round : `${state.round}/${state.maxRounds}`;
-  $('#hud-score').textContent = fmtNum(state.score);
-  const v = $('#hud-extra-value');
-  if (state.mode === 'time') v.textContent = state.timeLeft;
-  else if (state.mode === 'streak') v.textContent = '❤️'.repeat(Math.max(0, 3 - state.misses));
-  else v.textContent = state.streak;
-}
+function buildPlayerCard(player) {
+  const card = document.createElement('div');
+  card.className = 'player-card';
+  const isYou = (mp && !mp.isHost && mp.myId === player.id) || (mp && mp.isHost && mp.peer.peer.id === player.id);
+  if (isYou) card.classList.add('you');
+  if (player.slots.every(s => s != null)) card.classList.add('complete');
 
-function nextRound(state) {
-  state.round += 1;
-  if (state.round > state.maxRounds) return endGame(state);
-
-  const stage = $('#game-stage');
-  stage.innerHTML = '';
-  updateHud(state);
-
-  if (state.mode === 'duel') return renderDuelRound(state, stage);
-  return renderGuessRound(state, stage);
-}
-
-// --- Guess round (classic / time / streak) ---
-function renderGuessRound(state, stage) {
-  const [car] = pickRandom(state.pool, 1, state.used);
-  if (!car) return endGame(state);
-  state.used.add(car.id);
-
-  stage.appendChild(renderCarCard(car));
-
-  // Guess block
-  const block = document.createElement('div');
-  block.className = 'guess-block';
-
-  const minP = 10000, maxP = 150000000;
-  const initial = 0.35;
-  block.innerHTML = `
-    <div class="guess-label">Was kostet dieses Auto (Neupreis / letzter bekannter Wert)?</div>
-    <div class="guess-value" id="guess-val"></div>
-    <input class="guess-slider" type="range" min="0" max="1000" value="${initial * 1000}" step="1" />
-    <div class="guess-quick">
-      <button data-step="-0.1">−10%</button>
-      <button data-step="-0.01">−1%</button>
-      <button data-step="0.01">+1%</button>
-      <button data-step="0.1">+10%</button>
+  const total = totalForPlayer(player);
+  card.innerHTML = `
+    <div class="player-card-head">
+      <div class="player-card-name">
+        ${player.isHost ? '<span class="crown">👑</span>' : ''}${escapeHtml(player.name)}${isYou ? ' <span style="color:var(--text-dim);font-size:12px;font-weight:500;">(du)</span>' : ''}
+      </div>
+      <div class="player-card-total">${fmtEUR(total)}</div>
     </div>
-    <button class="primary" id="btn-guess">Tippen</button>
+    <div class="slots-row"></div>
   `;
-  stage.appendChild(block);
-
-  const slider = $('input', block);
-  const valEl = $('#guess-val', block);
-  const update = () => {
-    const t = clamp(slider.value / 1000, 0, 1);
-    const price = logScale(minP, maxP, t);
-    valEl.textContent = fmtEUR(roundNice(price));
-    valEl.dataset.value = String(roundNice(price));
-  };
-  slider.addEventListener('input', update);
-  update();
-
-  $$('.guess-quick button', block).forEach(b => {
-    b.addEventListener('click', () => {
-      const t = clamp(parseFloat(slider.value) / 1000 + parseFloat(b.dataset.step), 0, 1);
-      slider.value = t * 1000;
-      update();
-    });
-  });
-
-  $('#btn-guess', block).addEventListener('click', () => {
-    const guess = parseFloat(valEl.dataset.value);
-    submitGuess(state, car, guess, stage);
-  });
+  const slotsRow = $('.slots-row', card);
+  player.slots.forEach((slot, idx) => slotsRow.appendChild(buildSlot(player, idx, slot)));
+  return card;
 }
 
-function roundNice(n) {
-  if (n < 1000) return Math.round(n / 100) * 100;
-  if (n < 10000) return Math.round(n / 500) * 500;
-  if (n < 100000) return Math.round(n / 1000) * 1000;
-  if (n < 1000000) return Math.round(n / 5000) * 5000;
-  if (n < 10000000) return Math.round(n / 50000) * 50000;
-  return Math.round(n / 500000) * 500000;
-}
-
-function submitGuess(state, car, guess, stage) {
-  const points = scoreGuess(car.price, guess);
-  state.score += points;
-  state.guesses += 1;
-  if (points >= 1100) state.perfect += 1;
-  if (points > state.bestRound) state.bestRound = points;
-  if (points >= 500) state.streak += 1; else state.streak = 0;
-
-  const ratio = Math.abs(car.price - guess) / Math.max(car.price, 1);
-  const isHit = ratio <= 0.25;
-  if (state.mode === 'streak' && !isHit) state.misses += 1;
-
-  state.history.push({ car, guess, points });
-
-  // Reveal panel
-  const reveal = document.createElement('div');
-  reveal.className = 'reveal';
-  const r = ratingFor(points);
-  reveal.innerHTML = `
-    <div class="points-pop">+${fmtNum(points)} ${r.emoji} <span style="-webkit-text-fill-color:initial;color:var(--text-dim);font-size:14px;font-weight:600;">${r.label}</span></div>
-    <div class="reveal-row"><span class="k">Tatsächlich</span><span class="v">${fmtEUR(car.price)}</span></div>
-    <div class="reveal-row"><span class="k">Dein Tipp</span><span class="v">${fmtEUR(guess)}</span></div>
-    <div class="reveal-row"><span class="k">Differenz</span><span class="v">${(ratio * 100).toFixed(1)}%</span></div>
-    <div class="reveal-bar">
-      <div class="actual" style="left:0%;width:${barPct(car.price)}%"></div>
-      <div class="your" style="left:0%;width:${barPct(guess)}%"></div>
-    </div>
-    <button class="primary" id="btn-next">${shouldEnd(state) ? 'Auswertung' : 'Weiter'}</button>
-  `;
-  stage.appendChild(reveal);
-  updateHud(state);
-
-  $('#btn-next', reveal).addEventListener('click', () => {
-    if (shouldEnd(state)) endGame(state);
-    else nextRound(state);
-  });
-}
-
-function barPct(price) {
-  const t = logScaleInverse(10000, 150000000, price);
-  return clamp(t * 100, 1, 100);
-}
-
-function shouldEnd(state) {
-  if (state.mode === 'classic') return state.round >= state.maxRounds;
-  if (state.mode === 'streak') return state.misses >= 3;
-  if (state.mode === 'time') return state.timeLeft <= 0;
-  return false;
-}
-
-// --- Duel round ---
-function renderDuelRound(state, stage) {
-  const [a, b] = pickRandom(state.pool, 2, state.used);
-  if (!a || !b) return endGame(state);
-  // Don't add to used so we keep variety; only avoid the very last pair
-  const grid = document.createElement('div');
-  grid.className = 'duel-grid';
-  const cardA = renderCarCard(a);
-  const cardB = renderCarCard(b);
-  const vs = document.createElement('div');
-  vs.className = 'duel-vs'; vs.textContent = 'VS';
-  grid.append(cardA, vs, cardB);
-  stage.appendChild(grid);
-
-  const handle = (chosen, other, chosenEl, otherEl) => {
-    const correct = chosen.price >= other.price;
-    chosenEl.classList.add(correct ? 'correct' : 'wrong');
-    otherEl.classList.add(correct ? 'wrong' : 'correct');
-    const points = correct ? 500 + state.streak * 100 : 0;
-    state.score += points;
-    state.guesses += 1;
-    if (correct) { state.streak += 1; if (points > state.bestRound) state.bestRound = points; }
-    else { state.streak = 0; state.misses += 1; }
-    state.history.push({ car: chosen, guess: chosen.price, points, dueled: other });
-
-    const reveal = document.createElement('div');
-    reveal.className = 'reveal';
-    reveal.innerHTML = `
-      <div class="points-pop">${correct ? '✓ +' + fmtNum(points) : '✗ Daneben'}</div>
-      <div class="reveal-row"><span class="k">${a.brand} ${a.model}</span><span class="v">${fmtEUR(a.price)}</span></div>
-      <div class="reveal-row"><span class="k">${b.brand} ${b.model}</span><span class="v">${fmtEUR(b.price)}</span></div>
-      <button class="primary" id="btn-next">${state.misses >= 3 && state.mode === 'streak' ? 'Auswertung' : 'Weiter'}</button>
+function buildSlot(player, idx, car) {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'slot';
+  if (car) {
+    el.classList.add('filled');
+    el.innerHTML = `
+      <div class="slot-emoji">${car.emoji || '🚗'}</div>
+      <div class="slot-name">${escapeHtml(car.brand)} ${escapeHtml(car.model)}</div>
+      <div class="slot-price">${fmtEUR(car.price)}</div>
     `;
-    stage.appendChild(reveal);
-    updateHud(state);
-    $('#btn-next', reveal).addEventListener('click', () => {
-      if (state.mode === 'duel' && state.misses >= 3) return endGame(state);
-      nextRound(state);
-    });
-  };
-
-  cardA.addEventListener('click', () => handle(a, b, cardA, cardB));
-  cardB.addEventListener('click', () => handle(b, a, cardB, cardA));
-
-  // Duel mode default: 3 lives
-  if (state.maxRounds === Infinity && state.mode === 'duel') {
-    $('#hud-extra-label').textContent = 'Leben';
-    $('#hud-extra-value').textContent = '❤️'.repeat(Math.max(0, 3 - state.misses));
+    return el;
   }
+
+  // Determine if this slot is editable for the current user
+  const editable = canEditSlot(player);
+  if (!editable) {
+    el.classList.add('locked');
+    el.innerHTML = `<div class="slot-plus">·</div><div>Slot ${idx + 1}</div>`;
+    el.disabled = true;
+    return el;
+  }
+  el.innerHTML = `
+    <div class="slot-meins">MEINS!</div>
+    <div class="slot-plus">+</div>
+  `;
+  el.addEventListener('click', async () => {
+    const car = await openCarSearch(`Auto für ${player.name} eintragen`);
+    if (!car) return;
+    handleAddCar(player.id, idx, car);
+  });
+  return el;
 }
 
-// ---------- END / SUMMARY ----------
-function endGame(state) {
-  if (state.timerId) clearInterval(state.timerId);
+function canEditSlot(player) {
+  if (!game) return false;
+  if (game.mode === 'single') return true;
+  // multiplayer:
+  if (mp?.isHost) {
+    // host can edit own slots; or any unfilled slot if needed (we keep strict: each player only edits own)
+    return mp.peer.peer.id === player.id;
+  }
+  // peer
+  return mp?.myId === player.id;
+}
 
-  const result = store.recordGame({
-    mode: state.mode,
-    score: state.score,
-    perfect: state.perfect,
-    guesses: state.guesses,
-    bestRound: state.bestRound,
-  });
+function handleAddCar(playerId, slotIdx, car) {
+  if (!game) return;
+  if (mp && !mp.isHost) {
+    // peer → send to host
+    mp.peer.send({ type: 'addCar', playerId, slotIdx, car });
+    return;
+  }
+  // single or host
+  setSlot(game, playerId, slotIdx, car);
+  if (mp?.isHost) mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+  refreshGameView();
+}
 
+// ============================================================
+// SUMMARY
+// ============================================================
+function renderSummary(state) {
   app.innerHTML = '';
   app.appendChild(tpl('tpl-summary'));
-  $('#summary-score').textContent = fmtNum(state.score);
-  const subParts = [];
-  if (result.rank > 0 && result.rank <= 10) subParts.push(`🏆 Platz ${result.rank} in der Bestenliste`);
-  subParts.push(`${state.guesses} Tipps · ${state.perfect} Volltreffer`);
-  $('#summary-sub').textContent = subParts.join(' · ');
+  const sorted = ranking(state);
+  const winner = sorted[0];
+  $('#summary-winner').textContent = winner ? winner.name : '–';
+  $('#summary-sub').textContent = `${fmtEUR(winner?.total || 0)} · ${state.players.length} Spieler · ${SLOT_COUNT * state.players.length} Autos`;
 
-  const list = $('#summary-list');
-  state.history.forEach(({ car, guess, points }) => {
-    const r = ratingFor(points);
+  const list = $('#summary-ranking');
+  sorted.forEach((p, i) => {
     const row = document.createElement('div');
-    row.className = `summary-item ${r.cls}`;
-    const delta = car.price ? `${(((guess - car.price) / car.price) * 100).toFixed(0)}%` : '–';
+    row.className = 'rank-row' + (i === 0 ? ' first' : '');
+    const cars = p.slots.filter(Boolean).map(c => `${c.brand} ${c.model}`).join(' · ');
+    const medal = ['🥇','🥈','🥉'][i] || `#${i + 1}`;
     row.innerHTML = `
-      <div><strong>${car.brand} ${car.model}</strong><br><span style="color:var(--text-dim);font-size:12px;">${fmtEUR(car.price)}</span></div>
-      <div class="delta">${delta}</div>
-      <div class="pts">+${fmtNum(points)}</div>
+      <div class="rank-medal">${medal}</div>
+      <div>
+        <div class="rank-name">${escapeHtml(p.name)}</div>
+        <div class="rank-cars">${escapeHtml(cars)}</div>
+      </div>
+      <div class="rank-total">${fmtEUR(p.total)}</div>
     `;
     list.appendChild(row);
   });
 
-  $('#btn-replay').addEventListener('click', () => startGame(state.mode));
-  $('#btn-home').addEventListener('click', renderHome);
-}
-
-// ---------- NAV: Stats / Leaderboard / Settings ----------
-function showStats() {
-  const s = store.getStats();
-  const acc = s.totalGuesses ? Math.round((s.perfectGuesses / s.totalGuesses) * 100) : 0;
-  const wrap = document.createElement('div');
-  wrap.className = 'stats-strip';
-  wrap.style.gridTemplateColumns = '1fr 1fr';
-  [
-    ['Spiele gespielt', fmtNum(s.games)],
-    ['Punkte gesamt', fmtNum(s.totalScore)],
-    ['Beste Runde', fmtNum(s.bestRound)],
-    ['Tipps gesamt', fmtNum(s.totalGuesses)],
-    ['Volltreffer', fmtNum(s.perfectGuesses)],
-    ['Trefferquote', `${acc}%`],
-  ].forEach(([k, v]) => {
-    const el = document.createElement('div');
-    el.className = 'stat-pill';
-    el.innerHTML = `<div class="v">${v}</div><div class="k">${k}</div>`;
-    wrap.appendChild(el);
-  });
-  openModal('Statistiken', wrap);
-}
-
-function showLeaderboard() {
-  const wrap = document.createElement('div');
-  const modes = [
-    ['classic', '🏁 Klassisch'],
-    ['time', '⏱️ Zeitrennen'],
-    ['streak', '🔥 Streak'],
-    ['duel', '⚔️ Duell'],
-  ];
-  modes.forEach(([key, label]) => {
-    const h = document.createElement('h3'); h.textContent = label; h.style.margin = '14px 0 8px';
-    wrap.appendChild(h);
-    const list = store.getLeaderboard(key);
-    if (!list.length) {
-      const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'Noch keine Einträge.';
-      wrap.appendChild(e); return;
+  $('#summary-rematch').addEventListener('click', () => {
+    if (mp?.isHost) {
+      // restart in same room
+      const players = game.players.map(p => ({ id: p.id, name: p.name, isHost: p.isHost }));
+      game = newGameFromPlayers('multi', players, mp.peer.peer.id);
+      mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+      renderGame();
+    } else if (mp && !mp.isHost) {
+      toast('Nur der Rundenmeister kann ein neues Spiel starten.');
+    } else {
+      // single
+      startSingleGame(state.players.map(p => p.name));
     }
-    const ul = document.createElement('div'); ul.className = 'lb-list';
-    list.forEach((entry, i) => {
-      const row = document.createElement('div');
-      row.className = 'lb-row';
-      row.innerHTML = `
-        <div class="rank">#${i + 1}</div>
-        <div>${escapeHtml(entry.name || 'Du')}</div>
-        <div class="pts">${fmtNum(entry.score)}</div>
-        <div style="color:var(--text-dim);font-size:12px;">${relTime(entry.date)}</div>
-      `;
-      ul.appendChild(row);
+  });
+  $('#summary-home').addEventListener('click', renderHome);
+}
+
+// ============================================================
+// MULTIPLAYER FLOWS
+// ============================================================
+async function flowCreateRoom(name) {
+  app.innerHTML = '';
+  app.appendChild(tpl('tpl-room'));
+  $('#room-back').addEventListener('click', () => { cleanupSession(); renderSetup(); });
+  const code = makeRoomCode();
+  $('#room-code').textContent = code;
+  setStatus('Verbinde mit Signaling-Server…');
+
+  let host;
+  try {
+    host = await createHost(code, {
+      onPeerJoin: () => mpRefreshLobby(),
+      onPeerLeave: (peerId) => {
+        if (game) game.players = game.players.filter(p => p.id !== peerId);
+        mpRefreshLobby();
+      },
+      onMessage: (peerId, msg) => mpHandleHostMsg(peerId, msg),
+      onError: (err) => console.warn('host error', err),
     });
-    wrap.appendChild(ul);
-  });
-  openModal('Bestenliste', wrap);
+  } catch (e) {
+    setStatus(e.message || 'Verbindung fehlgeschlagen', true);
+    return;
+  }
+  mp = {
+    isHost: true, host,
+    players: [{ id: host.peer.id, name, isHost: true }], // lobby roster
+  };
+  mpRenderRoom();
 }
 
-function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function flowJoinRoom(name) {
+  app.innerHTML = '';
+  app.appendChild(tpl('tpl-room'));
+  $('#room-back').addEventListener('click', () => { cleanupSession(); renderSetup(); });
+  $('#room-code').textContent = '____';
+  $('#room-share').hidden = true;
+  $('#room-join-input').hidden = false;
+  setStatus(null);
 
-function showSettings() {
-  const s = store.getSettings();
-  const wrap = document.createElement('div');
-  wrap.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:14px;">
-      <label style="display:flex;flex-direction:column;gap:6px;">
-        <span style="color:var(--text-dim);font-size:13px;">Dein Name</span>
-        <input id="set-name" type="text" maxlength="20" value="${escapeHtml(s.name || '')}" placeholder="z. B. Moritz" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;font:inherit;" />
-      </label>
-      <div>
-        <div style="color:var(--text-dim);font-size:13px;margin-bottom:6px;">Datenbank</div>
-        <div style="font-size:14px;">${CARS.length} Autos · von ${fmtEUR(Math.min(...CARS.map(c=>c.price)))} bis ${fmtEUR(Math.max(...CARS.map(c=>c.price)))}</div>
-      </div>
-      <button class="secondary" id="set-reset" style="margin-top:6px;">Alle Daten zurücksetzen</button>
-    </div>
-  `;
-  openModal('Einstellungen', wrap);
-  $('#set-name', wrap).addEventListener('change', (e) => {
-    store.setSettings({ name: e.target.value.trim() });
-    toast('Gespeichert');
+  const input = $('#room-code-input');
+  // Pre-fill if ?room param set
+  const param = new URLSearchParams(location.search).get('room');
+  if (param) input.value = param.toUpperCase().slice(0, 4);
+  input.focus();
+  input.addEventListener('input', () => {
+    input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
   });
-  $('#set-reset', wrap).addEventListener('click', () => {
-    if (confirm('Alle Statistiken & Bestenlisten löschen?')) {
-      store.reset();
-      toast('Zurückgesetzt');
-      $('#modal-root').hidden = true; $('#modal-root').innerHTML = '';
-      renderHome();
+  const go = async () => {
+    const code = input.value.trim().toUpperCase();
+    if (code.length < 4) { toast('Code unvollständig'); return; }
+    setStatus(`Verbinde mit Raum ${code}…`);
+    try {
+      const peer = await joinHost(code, {
+        name,
+        onMessage: (msg) => mpHandlePeerMsg(msg),
+        onClose: () => { toast('Verbindung beendet'); renderHome(); },
+        onError: (err) => console.warn('peer error', err),
+      });
+      mp = { isHost: false, peer, myId: peer.peer.id, myName: name };
+      $('#room-code').textContent = code;
+      $('#room-share').hidden = false;
+      $('#room-share').addEventListener('click', () => copyShare(code));
+      $('#room-join-input').hidden = true;
+      setStatus(null);
+      const role = $('#room-role'); role.className = 'mp-role'; role.textContent = '🎮 Spieler';
+    } catch (e) {
+      setStatus(e.message || 'Verbindung fehlgeschlagen', true);
     }
-  });
+  };
+  $('#room-go').addEventListener('click', go);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
 }
 
-$('#nav-stats').addEventListener('click', showStats);
-$('#nav-leaderboard').addEventListener('click', showLeaderboard);
-$('#nav-settings').addEventListener('click', showSettings);
-$('#db-badge').textContent = `v3.0 · ${CARS.length} Autos`;
+function mpRenderRoom() {
+  // Host view of the room (lobby)
+  const role = $('#room-role'); role.className = 'mp-role host'; role.textContent = '👑 Du bist Rundenmeister';
+  $('#room-host-controls').hidden = false;
+  $('#room-share').addEventListener('click', () => copyShare(mp.host.roomCode));
+  $('#room-start').addEventListener('click', () => mpStartGame());
+  mpRefreshLobby();
+  setStatus(`Warte auf Mitspieler. Teile den Code: ${mp.host.roomCode}`);
+}
 
-// Auto-join multiplayer when opened via shared link (?room=XXXX)
-const _roomParam = new URLSearchParams(location.search).get('room');
-if (_roomParam) {
-  openMultiplayer(app, renderHome);
+function mpRefreshLobby() {
+  if (!mp?.isHost) return;
+  // Sync lobby roster: own + peer connections
+  const peerNames = mp.host.listPeers();
+  const me = mp.players.find(p => p.isHost) || { id: mp.host.peer.id, name: store.getSettings().name || 'Host', isHost: true };
+  mp.players = [me, ...peerNames.map(p => ({ id: p.id, name: p.name, isHost: false }))];
+
+  const list = $('#room-players');
+  list.innerHTML = '';
+  mp.players.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'player-row';
+    if (p.id === mp.host.peer.id) row.classList.add('you');
+    row.innerHTML = `
+      <div class="name">${escapeHtml(p.name)}</div>
+      <div class="role-tag ${p.isHost ? 'host' : ''}">${p.isHost ? '👑 Rundenmeister' : 'Spieler'}</div>
+    `;
+    list.appendChild(row);
+  });
+
+  $('#room-start').disabled = mp.players.length < 2;
+
+  // Push lobby roster to peers
+  mp.host.broadcast({ type: 'lobby', players: mp.players });
+}
+
+function mpStartGame() {
+  if (mp.players.length < 2) { toast('Mindestens 2 Spieler'); return; }
+  game = newGameFromPlayers('multi', mp.players, mp.host.peer.id);
+  // Save group
+  store.setLastGroup({ mode: 'multi', players: mp.players.map(p => ({ name: p.name })) });
+  mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+  renderGame();
+}
+
+function mpHandleHostMsg(peerId, msg) {
+  if (!mp?.isHost) return;
+  if (msg.type === 'addCar') {
+    if (!game) return;
+    // safety: only the player themself can fill their own slot (or host)
+    if (peerId !== msg.playerId) return;
+    setSlot(game, msg.playerId, msg.slotIdx, msg.car);
+    mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+    refreshGameView();
+  }
+  if (msg.type === 'name') {
+    // already handled by transport, just refresh roster
+    mpRefreshLobby();
+  }
+}
+
+function mpHandlePeerMsg(msg) {
+  if (!mp || mp.isHost) return;
+  if (msg.type === 'lobby') {
+    // we're still in the room lobby
+    const list = $('#room-players');
+    if (!list) return;
+    list.innerHTML = '';
+    msg.players.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'player-row';
+      if (p.id === mp.myId) row.classList.add('you');
+      row.innerHTML = `
+        <div class="name">${escapeHtml(p.name)}</div>
+        <div class="role-tag ${p.isHost ? 'host' : ''}">${p.isHost ? '👑 Rundenmeister' : 'Spieler'}</div>
+      `;
+      list.appendChild(row);
+    });
+    setStatus('Warte auf Spielstart durch den Rundenmeister…');
+  }
+  if (msg.type === 'state') {
+    game = wireToGame(msg.state);
+    if (!app.querySelector('.view-game')) renderGame();
+    else refreshGameView();
+  }
+}
+
+// Wire helpers (just JSON copies, kept for clarity)
+function gameToWire(g) {
+  return {
+    mode: g.mode, status: g.status, hostId: g.hostId,
+    players: g.players.map(p => ({ id: p.id, name: p.name, isHost: !!p.isHost, slots: p.slots.slice() })),
+  };
+}
+function wireToGame(w) {
+  return {
+    mode: w.mode, status: w.status, hostId: w.hostId,
+    players: w.players.map(p => ({ id: p.id, name: p.name, isHost: !!p.isHost, slots: p.slots.slice() })),
+  };
+}
+
+// ============================================================
+// helpers
+// ============================================================
+function setStatus(text, isError = false) {
+  const el = $('#room-status');
+  if (!el) return;
+  if (!text) { el.hidden = true; el.textContent = ''; el.classList.remove('error'); return; }
+  el.hidden = false; el.textContent = text;
+  el.classList.toggle('error', !!isError);
+}
+
+function copyShare(code) {
+  const url = `${location.origin}${location.pathname}?room=${code}`;
+  const text = `MEINS! – Raum-Code: ${code}\n${url}`;
+  if (navigator.share) {
+    navigator.share({ title: 'MEINS!', text }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => toast('Code kopiert')).catch(() => toast(`Code: ${code}`));
+  } else {
+    toast(`Code: ${code}`);
+  }
+}
+
+function cleanupSession() {
+  if (mp) {
+    if (mp.isHost) mp.host.destroy();
+    else mp.peer.destroy();
+    mp = null;
+  }
+  game = null;
+}
+
+// Brand → home
+$('#brand-home').addEventListener('click', () => {
+  if (game && game.status === 'playing') {
+    if (!confirm('Spiel verlassen?')) return;
+  }
+  renderHome();
+});
+
+// Auto-join on ?room=XXXX
+const roomParam = new URLSearchParams(location.search).get('room');
+if (roomParam) {
+  // jump into multi-join setup with name prompt
+  app.innerHTML = '';
+  app.appendChild(tpl('tpl-setup'));
+  // switch to multi pane
+  $$('#setup-mode-seg button').forEach(b => {
+    b.classList.toggle('active', b.dataset.setupMode === 'multi');
+  });
+  $('#setup-single').hidden = true;
+  $('#setup-multi').hidden = false;
+  $('#setup-back').addEventListener('click', renderHome);
+  const myName = $('#multi-name');
+  myName.value = store.getSettings().name || '';
+  $('#multi-create').addEventListener('click', async () => {
+    const n = myName.value.trim() || 'Host';
+    store.setSettings({ name: n });
+    await flowCreateRoom(n);
+  });
+  $('#multi-join').addEventListener('click', () => {
+    const n = myName.value.trim();
+    if (!n) { myName.focus(); toast('Bitte deinen Namen eingeben'); return; }
+    store.setSettings({ name: n });
+    flowJoinRoom(n);
+  });
+  // auto trigger join if name is already saved
+  if (myName.value.trim()) flowJoinRoom(myName.value.trim());
 } else {
   renderHome();
 }
