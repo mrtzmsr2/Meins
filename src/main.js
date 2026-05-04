@@ -3,8 +3,10 @@ import { fmtEUR, fmtNum, escapeHtml, randomId } from './util.js';
 import { store } from './store.js';
 import { createHost, joinHost, makeRoomCode } from './multiplayer.js';
 import {
-  newGame, newGameFromPlayers, setSlot, ranking, progress, totalForPlayer,
-  SLOT_COUNT,
+  newGame, newGameFromPlayers, setSlot, clearSlot, ranking, progress, totalForPlayer,
+  isInCooldown, cooldownRemainingMs,
+  clampSlotCount, clampCooldownSec,
+  MIN_SLOT_COUNT, MAX_SLOT_COUNT, MIN_COOLDOWN_SEC, MAX_COOLDOWN_SEC,
 } from './game.js';
 import { openCarSearch } from './car-search.js';
 
@@ -16,12 +18,85 @@ const app = $('#app');
 let mp = null;       // current multiplayer session (host or peer)
 let game = null;     // current game state (single device only — multi state lives on host)
 let lastGame = null; // for "rematch" with same group
+let cooldownTickHandle = null;
 
 function toast(msg, ms = 1800) {
   const el = document.createElement('div');
   el.className = 'toast'; el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), ms);
+}
+
+// ============================================================
+// SETTINGS UI (slot count + cooldown), pre-game only
+// ============================================================
+function renderSettingsBlock(host, { onChange } = {}) {
+  const s = store.getSettings();
+  let slotCount = clampSlotCount(s.slotCount ?? 3);
+  let cooldownSec = clampCooldownSec(s.cooldownSec ?? 30);
+
+  host.innerHTML = `
+    <div class="settings-title">Spiel-Einstellungen</div>
+    <div class="settings-row">
+      <div>
+        <label>Anzahl Slots pro Spieler</label>
+        <span class="hint">Wie viele Autos jeder Spieler einträgt</span>
+      </div>
+      <div class="stepper" data-key="slot">
+        <button type="button" data-step="-1" aria-label="weniger">−</button>
+        <div class="value" id="set-slot-val">${slotCount}</div>
+        <button type="button" data-step="1" aria-label="mehr">+</button>
+      </div>
+    </div>
+    <div class="settings-row">
+      <div>
+        <label>Cooldown nach Löschen</label>
+        <span class="hint">Wartezeit bis ein Spieler nach Löschen wieder eintragen darf</span>
+      </div>
+      <div class="stepper" data-key="cool">
+        <button type="button" data-step="-5" aria-label="weniger">−</button>
+        <div class="value" id="set-cool-val">${cooldownSec}s</div>
+        <button type="button" data-step="5" aria-label="mehr">+</button>
+      </div>
+    </div>
+  `;
+
+  const slotVal = $('#set-slot-val', host);
+  const coolVal = $('#set-cool-val', host);
+  const updateDisabled = () => {
+    host.querySelectorAll('.stepper[data-key="slot"] button').forEach(b => {
+      const step = parseInt(b.dataset.step, 10);
+      b.disabled = (step < 0 && slotCount <= MIN_SLOT_COUNT) || (step > 0 && slotCount >= MAX_SLOT_COUNT);
+    });
+    host.querySelectorAll('.stepper[data-key="cool"] button').forEach(b => {
+      const step = parseInt(b.dataset.step, 10);
+      b.disabled = (step < 0 && cooldownSec <= MIN_COOLDOWN_SEC) || (step > 0 && cooldownSec >= MAX_COOLDOWN_SEC);
+    });
+  };
+
+  host.querySelectorAll('.stepper[data-key="slot"] button').forEach(b => {
+    b.addEventListener('click', () => {
+      slotCount = clampSlotCount(slotCount + parseInt(b.dataset.step, 10));
+      slotVal.textContent = slotCount;
+      store.setSettings({ slotCount });
+      updateDisabled();
+      onChange?.({ slotCount, cooldownSec });
+    });
+  });
+  host.querySelectorAll('.stepper[data-key="cool"] button').forEach(b => {
+    b.addEventListener('click', () => {
+      cooldownSec = clampCooldownSec(cooldownSec + parseInt(b.dataset.step, 10));
+      coolVal.textContent = `${cooldownSec}s`;
+      store.setSettings({ cooldownSec });
+      updateDisabled();
+      onChange?.({ slotCount, cooldownSec });
+    });
+  });
+  updateDisabled();
+
+  return {
+    get values() { return { slotCount, cooldownSec }; },
+  };
 }
 
 // ============================================================
@@ -72,6 +147,9 @@ function renderSetup() {
   const list = $('#single-players');
   const startBtn = $('#single-start');
   const nameInput = $('#single-name');
+
+  // settings (slots + cooldown) shared via store
+  const settingsApi = renderSettingsBlock($('#single-settings'));
   const refreshList = () => {
     list.innerHTML = '';
     players.forEach((p, i) => {
@@ -103,7 +181,7 @@ function renderSetup() {
     nameInput.focus();
     refreshList();
   });
-  startBtn.addEventListener('click', () => startSingleGame(players.map(p => p.name)));
+  startBtn.addEventListener('click', () => startSingleGame(players.map(p => p.name), settingsApi.values));
 
   // Multi-device setup
   const myName = $('#multi-name');
@@ -127,9 +205,13 @@ function renderSetup() {
 // ============================================================
 // SINGLE-DEVICE GAME
 // ============================================================
-function startSingleGame(names) {
+function startSingleGame(names, opts = null) {
   if (names.length < 2) { toast('Mindestens 2 Spieler'); return; }
-  game = newGame('single', names);
+  const settings = opts || store.getSettings();
+  game = newGame('single', names, null, {
+    slotCount: settings.slotCount,
+    cooldownSec: settings.cooldownSec,
+  });
   store.setLastGroup({ mode: 'single', players: names.map(n => ({ name: n })) });
   lastGame = { names: [...names] };
   renderGame();
@@ -164,30 +246,59 @@ function refreshGameView() {
   $('#game-tip').textContent = game.status === 'done'
     ? 'Alle Slots voll — gleich kommt die Auswertung.'
     : (game.mode === 'single'
-        ? 'Ruft "Meins!" → tippt den Slot des Spielers an, der zuerst war.'
-        : 'Ruft "Meins!" → tippt einen freien Slot bei dir, um dein Auto einzutragen.');
+        ? 'Tippt einen Slot zum Eintragen. Lange auf einen Slot drücken oder ✕ zum Löschen (Cooldown!).'
+        : 'Ruft "Meins!" → tippt einen freien Slot bei dir. ✕ zum Löschen (Cooldown!).');
+
+  startCooldownTickIfNeeded();
 
   if (game.status === 'done') {
     setTimeout(() => renderSummary(game), 500);
   }
 }
 
+function startCooldownTickIfNeeded() {
+  const anyCooldown = game?.players?.some(p => isInCooldown(p));
+  if (!anyCooldown) {
+    if (cooldownTickHandle) { clearInterval(cooldownTickHandle); cooldownTickHandle = null; }
+    return;
+  }
+  if (cooldownTickHandle) return;
+  cooldownTickHandle = setInterval(() => {
+    if (!game) { clearInterval(cooldownTickHandle); cooldownTickHandle = null; return; }
+    const stillCooling = game.players.some(p => isInCooldown(p));
+    // update DOM lightly: re-render the grid
+    if (app.querySelector('.view-game')) {
+      const grid = $('#players-grid');
+      if (grid) {
+        grid.innerHTML = '';
+        game.players.forEach(p => grid.appendChild(buildPlayerCard(p)));
+      }
+    }
+    if (!stillCooling) { clearInterval(cooldownTickHandle); cooldownTickHandle = null; }
+  }, 250);
+}
+
 function buildPlayerCard(player) {
   const card = document.createElement('div');
   card.className = 'player-card';
-  const isYou = (mp && !mp.isHost && mp.myId === player.id) || (mp && mp.isHost && mp.peer.peer.id === player.id);
+  const isYou = (mp && !mp.isHost && mp.myId === player.id) || (mp && mp.isHost && mp.host.peer.id === player.id);
   if (isYou) card.classList.add('you');
   if (player.slots.every(s => s != null)) card.classList.add('complete');
 
   const total = totalForPlayer(player);
+  const cooldownMs = cooldownRemainingMs(player);
+  const cooldownBadge = cooldownMs > 0
+    ? `<span class="cooldown-badge" title="Cooldown nach Löschen">⏱ ${Math.ceil(cooldownMs / 1000)}s</span>`
+    : '';
+
   card.innerHTML = `
     <div class="player-card-head">
       <div class="player-card-name">
-        ${player.isHost ? '<span class="crown">👑</span>' : ''}${escapeHtml(player.name)}${isYou ? ' <span style="color:var(--text-dim);font-size:12px;font-weight:500;">(du)</span>' : ''}
+        ${player.isHost ? '<span class="crown">👑</span>' : ''}${escapeHtml(player.name)}${isYou ? ' <span style="color:var(--text-dim);font-size:12px;font-weight:500;">(du)</span>' : ''}${cooldownBadge}
       </div>
       <div class="player-card-total">${fmtEUR(total)}</div>
     </div>
-    <div class="slots-row"></div>
+    <div class="slots-row" style="--slot-cols:${game.slotCount}"></div>
   `;
   const slotsRow = $('.slots-row', card);
   player.slots.forEach((slot, idx) => slotsRow.appendChild(buildSlot(player, idx, slot)));
@@ -198,6 +309,9 @@ function buildSlot(player, idx, car) {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'slot';
+  const editable = canEditSlot(player);
+  const cooling = isInCooldown(player);
+
   if (car) {
     el.classList.add('filled');
     el.innerHTML = `
@@ -205,14 +319,37 @@ function buildSlot(player, idx, car) {
       <div class="slot-name">${escapeHtml(car.brand)} ${escapeHtml(car.model)}</div>
       <div class="slot-price">${fmtEUR(car.price)}</div>
     `;
+    if (editable) {
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'slot-delete';
+      del.title = 'Auto löschen (Cooldown!)';
+      del.setAttribute('aria-label', 'Auto löschen');
+      del.textContent = '✕';
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cdSec = game?.cooldownSec || 0;
+        const msg = cdSec > 0
+          ? `${player.name}: "${car.brand} ${car.model}" löschen?\nDanach ${cdSec}s Cooldown.`
+          : `${player.name}: "${car.brand} ${car.model}" löschen?`;
+        if (confirm(msg)) handleClearSlot(player.id, idx);
+      });
+      el.appendChild(del);
+    }
     return el;
   }
 
-  // Determine if this slot is editable for the current user
-  const editable = canEditSlot(player);
+  // Empty slot
   if (!editable) {
     el.classList.add('locked');
     el.innerHTML = `<div class="slot-plus">·</div><div>Slot ${idx + 1}</div>`;
+    el.disabled = true;
+    return el;
+  }
+  if (cooling) {
+    const sec = Math.ceil(cooldownRemainingMs(player) / 1000);
+    el.classList.add('cooldown');
+    el.innerHTML = `<div class="slot-meins">⏱ ${sec}s</div><div class="slot-plus">Cooldown</div>`;
     el.disabled = true;
     return el;
   }
@@ -233,8 +370,7 @@ function canEditSlot(player) {
   if (game.mode === 'single') return true;
   // multiplayer:
   if (mp?.isHost) {
-    // host can edit own slots; or any unfilled slot if needed (we keep strict: each player only edits own)
-    return mp.peer.peer.id === player.id;
+    return mp.host.peer.id === player.id;
   }
   // peer
   return mp?.myId === player.id;
@@ -243,12 +379,27 @@ function canEditSlot(player) {
 function handleAddCar(playerId, slotIdx, car) {
   if (!game) return;
   if (mp && !mp.isHost) {
-    // peer → send to host
     mp.peer.send({ type: 'addCar', playerId, slotIdx, car });
     return;
   }
   // single or host
-  setSlot(game, playerId, slotIdx, car);
+  const res = setSlot(game, playerId, slotIdx, car);
+  if (!res.ok && res.reason === 'cooldown') {
+    toast('Noch im Cooldown — warte kurz.');
+    return;
+  }
+  if (mp?.isHost) mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+  refreshGameView();
+}
+
+function handleClearSlot(playerId, slotIdx) {
+  if (!game) return;
+  if (mp && !mp.isHost) {
+    mp.peer.send({ type: 'removeCar', playerId, slotIdx });
+    return;
+  }
+  const res = clearSlot(game, playerId, slotIdx);
+  if (!res.ok) return;
   if (mp?.isHost) mp.host.broadcast({ type: 'state', state: gameToWire(game) });
   refreshGameView();
 }
@@ -262,7 +413,7 @@ function renderSummary(state) {
   const sorted = ranking(state);
   const winner = sorted[0];
   $('#summary-winner').textContent = winner ? winner.name : '–';
-  $('#summary-sub').textContent = `${fmtEUR(winner?.total || 0)} · ${state.players.length} Spieler · ${SLOT_COUNT * state.players.length} Autos`;
+  $('#summary-sub').textContent = `${fmtEUR(winner?.total || 0)} · ${state.players.length} Spieler · ${state.slotCount * state.players.length} Autos`;
 
   const list = $('#summary-ranking');
   sorted.forEach((p, i) => {
@@ -283,9 +434,12 @@ function renderSummary(state) {
 
   $('#summary-rematch').addEventListener('click', () => {
     if (mp?.isHost) {
-      // restart in same room
+      // restart in same room (use latest settings from store)
       const players = game.players.map(p => ({ id: p.id, name: p.name, isHost: p.isHost }));
-      game = newGameFromPlayers('multi', players, mp.peer.peer.id);
+      const s = store.getSettings();
+      game = newGameFromPlayers('multi', players, mp.host.peer.id, {
+        slotCount: s.slotCount, cooldownSec: s.cooldownSec,
+      });
       mp.host.broadcast({ type: 'state', state: gameToWire(game) });
       renderGame();
     } else if (mp && !mp.isHost) {
@@ -377,6 +531,8 @@ function flowJoinRoom(name) {
 function mpRenderRoom() {
   // Host view of the room (lobby)
   const role = $('#room-role'); role.className = 'mp-role host'; role.textContent = '👑 Du bist Rundenmeister';
+  // Pre-game settings for the host
+  renderSettingsBlock($('#room-settings'));
   $('#room-host-controls').hidden = false;
   $('#room-share').addEventListener('click', () => copyShare(mp.host.roomCode));
   $('#room-start').addEventListener('click', () => mpStartGame());

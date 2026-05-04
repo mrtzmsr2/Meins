@@ -4,7 +4,7 @@ const KEY = 'meins.v4.store';
 const defaults = () => ({
   lastGroup: null,           // { mode: 'single'|'multi', players: [{name}] }
   customCars: [],            // user-added cars added via manual entry
-  settings: { name: '' },
+  settings: { name: '', slotCount: 3, cooldownSec: 30 },
 });
 
 let cache = null;
