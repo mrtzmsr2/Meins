@@ -566,7 +566,10 @@ function mpRefreshLobby() {
   mp.host.broadcast({ type: 'lobby', players: mp.players });
 }
 
-function mpStartGame() {
+fuconst s = store.getSettings();
+  game = newGameFromPlayers('multi', mp.players, mp.host.peer.id, {
+    slotCount: s.slotCount, cooldownSec: s.cooldownSec,
+  }
   if (mp.players.length < 2) { toast('Mindestens 2 Spieler'); return; }
   game = newGameFromPlayers('multi', mp.players, mp.host.peer.id);
   // Save group
@@ -574,14 +577,24 @@ function mpStartGame() {
   mp.host.broadcast({ type: 'state', state: gameToWire(game) });
   renderGame();
 }
-
-function mpHandleHostMsg(peerId, msg) {
-  if (!mp?.isHost) return;
-  if (msg.type === 'addCar') {
+if (peerId !== msg.playerId) return;
+    const res = setSlot(game, msg.playerId, msg.slotIdx, msg.car);
+    if (!res.ok && res.reason === 'cooldown') {
+      mp.host.sendTo(peerId, { type: 'denied', reason: 'cooldown' });
+      return;
+    }
+    mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+    refreshGameView();
+  }
+  if (msg.type === 'removeCar') {
     if (!game) return;
-    // safety: only the player themself can fill their own slot (or host)
     if (peerId !== msg.playerId) return;
-    setSlot(game, msg.playerId, msg.slotIdx, msg.car);
+    const res = clearSlot(game, msg.playerId, msg.slotIdx);
+    if (!res.ok) return;
+    mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+    refreshGameView();
+  }
+  if (msg.type === 'name') {
     mp.host.broadcast({ type: 'state', state: gameToWire(game) });
     refreshGameView();
   }
@@ -600,19 +613,31 @@ function mpHandlePeerMsg(msg) {
     list.innerHTML = '';
     msg.players.forEach(p => {
       const row = document.createElement('div');
-      row.className = 'player-row';
-      if (p.id === mp.myId) row.classList.add('you');
-      row.innerHTML = `
-        <div class="name">${escapeHtml(p.name)}</div>
-        <div class="role-tag ${p.isHost ? 'host' : ''}">${p.isHost ? '👑 Rundenmeister' : 'Spieler'}</div>
-      `;
-      list.appendChild(row);
-    });
-    setStatus('Warte auf Spielstart durch den Rundenmeister…');
+  if (msg.type === 'denied') {
+    if (msg.reason === 'cooldown') toast('Noch im Cooldown — warte kurz.');
   }
-  if (msg.type === 'state') {
-    game = wireToGame(msg.state);
-    if (!app.querySelector('.view-game')) renderGame();
+}
+
+// Wire helpers (just JSON copies, kept for clarity)
+function gameToWire(g) {
+  return {
+    mode: g.mode, status: g.status, hostId: g.hostId,
+    slotCount: g.slotCount, cooldownSec: g.cooldownSec,
+    players: g.players.map(p => ({
+      id: p.id, name: p.name, isHost: !!p.isHost,
+      slots: p.slots.slice(), cooldownUntil: p.cooldownUntil || 0,
+    })),
+  };
+}
+function wireToGame(w) {
+  return {
+    mode: w.mode, status: w.status, hostId: w.hostId,
+    slotCount: clampSlotCount(w.slotCount),
+    cooldownSec: clampCooldownSec(w.cooldownSec),
+    players: w.players.map(p => ({
+      id: p.id, name: p.name, isHost: !!p.isHost,
+      slots: p.slots.slice(), cooldownUntil: p.cooldownUntil || 0,
+   
     else refreshGameView();
   }
 }
@@ -636,6 +661,7 @@ function wireToGame(w) {
 // ============================================================
 function setStatus(text, isError = false) {
   const el = $('#room-status');
+  if (cooldownTickHandle) { clearInterval(cooldownTickHandle); cooldownTickHandle = null; }
   if (!el) return;
   if (!text) { el.hidden = true; el.textContent = ''; el.classList.remove('error'); return; }
   el.hidden = false; el.textContent = text;

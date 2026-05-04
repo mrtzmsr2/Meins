@@ -1,21 +1,21 @@
 /* MEINS! v4 – Modern dark UI */
 *,*::before,*::after { box-sizing: border-box; }
 :root {
-  --bg: #0b0d12;
-  --bg-2: #11141c;
-  --surface: #161a24;
-  --surface-2: #1d222e;
-  --surface-3: #262c3a;
-  --border: #262c3a;
-  --border-strong: #3b465e;
-  --text: #e8ecf3;
-  --text-dim: #98a1b3;
+  --bg: #05070b;
+  --bg-2: #090b12;
+  --surface: #0f131c;
+  --surface-2: #161b27;
+  --surface-3: #1f2531;
+  --border: #1f2531;
+  --border-strong: #323a4e;
+  --text: #ffffff;
+  --text-dim: #b8bfcc;
   --accent: #ffd84d;
   --accent-2: #ff7a59;
   --good: #34d399;
   --bad: #f87171;
   --grad: linear-gradient(135deg, #ffd84d 0%, #ff7a59 50%, #ff3b8b 100%);
-  --shadow: 0 10px 40px -10px rgba(0,0,0,.5);
+  --shadow: 0 10px 40px -10px rgba(0,0,0,.7);
   --radius: 14px;
   --radius-lg: 22px;
 }
@@ -50,7 +50,7 @@ input, textarea { font: inherit; color: inherit; }
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 20px;
   backdrop-filter: blur(14px);
-  background: rgba(11,13,18,.6);
+  background: rgba(5,7,11,.7);
   border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
