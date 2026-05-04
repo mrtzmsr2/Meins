@@ -115,18 +115,12 @@ function renderSetup() {
   app.appendChild(tpl('tpl-setup'));
   $('#setup-back').addEventListener('click', renderHome);
 
-  const seg = $('#setup-mode-seg');
   const single = $('#setup-single');
   const multi = $('#setup-multi');
-
-  $$('button', seg).forEach(b => {
-    b.addEventListener('click', () => {
-      $$('button', seg).forEach(x => x.classList.toggle('active', x === b));
-      const mode = b.dataset.setupMode;
-      single.hidden = mode !== 'single';
-      multi.hidden = mode !== 'multi';
-    });
-  });
+  const showSingle = () => { single.hidden = false; multi.hidden = true; };
+  const showMulti = () => { single.hidden = true; multi.hidden = false; };
+  $('#switch-to-multi').addEventListener('click', showMulti);
+  $('#switch-to-single').addEventListener('click', showSingle);
 
   // Single-device setup
   const players = [];
@@ -665,9 +659,6 @@ const roomParam = new URLSearchParams(location.search).get('room');
 if (roomParam) {
   app.innerHTML = '';
   app.appendChild(tpl('tpl-setup'));
-  $$('#setup-mode-seg button').forEach(b => {
-    b.classList.toggle('active', b.dataset.setupMode === 'multi');
-  });
   $('#setup-single').hidden = true;
   $('#setup-multi').hidden = false;
   $('#setup-back').addEventListener('click', renderHome);

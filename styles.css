@@ -86,6 +86,10 @@ main {
   align-self: flex-start;
 }
 .ghost-link:hover { color: var(--text); }
+.mode-switch {
+  align-self: center; margin-top: 8px;
+  font-size: 13px;
+}
 
 /* Inputs */
 .text-input {

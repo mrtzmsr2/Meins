@@ -52,14 +52,9 @@
       <button class="ghost-link" id="setup-back">← Zurück</button>
       <h2>Neues Spiel</h2>
 
-      <div class="seg seg-block" id="setup-mode-seg" role="tablist">
-        <button data-setup-mode="single" class="active" role="tab">📱 Ein Gerät</button>
-        <button data-setup-mode="multi" role="tab">📡 Mehrere Geräte</button>
-      </div>
-
-      <!-- Single-device setup -->
+      <!-- Single-device setup (default) -->
       <div class="setup-pane" id="setup-single">
-        <div class="setup-hint">Spielernamen eintragen — die App hält für jeden 3 Slots bereit.</div>
+        <div class="setup-hint">Spielernamen eintragen — alle spielen auf diesem einen Gerät.</div>
         <form class="player-input-row" id="single-form">
           <input class="text-input" id="single-name" type="text" placeholder="Name" maxlength="20" autocomplete="off" />
           <button class="primary" type="submit">+ Hinzufügen</button>
@@ -67,6 +62,7 @@
         <div class="player-list" id="single-players"></div>
         <div class="settings-block" id="single-settings"></div>
         <button class="primary big" id="single-start" disabled>Spiel starten</button>
+        <button type="button" class="ghost-link mode-switch" id="switch-to-multi">📡 Lieber auf mehreren Geräten spielen?</button>
       </div>
 
       <!-- Multi-device setup -->
@@ -89,6 +85,7 @@
             </div>
           </button>
         </div>
+        <button type="button" class="ghost-link mode-switch" id="switch-to-single">← Zurück zu „Ein Gerät"</button>
       </div>
     </section>
   </template>
