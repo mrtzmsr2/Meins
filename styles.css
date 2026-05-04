@@ -226,6 +226,8 @@ main {
   border-radius: var(--radius); padding: 14px;
   display: flex; flex-direction: column; gap: 10px;
   transition: border-color .15s;
+  min-width: 0;
+  overflow: hidden;
 }
 .player-card.you { border-color: var(--text); }
 .player-card.complete { border-color: var(--good); }
@@ -241,7 +243,12 @@ main {
   white-space: nowrap;
 }
 
-.slots-row { display: grid; grid-template-columns: repeat(var(--slot-cols, 3), 1fr); gap: 6px; }
+.slots-row {
+  display: grid;
+  grid-template-columns: repeat(var(--slot-cols, 3), minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+}
 .slot {
   position: relative;
   background: transparent; border: 1px dashed var(--border-strong);
@@ -251,6 +258,8 @@ main {
   cursor: pointer;
   transition: border-color .15s, background .15s;
   font-size: 11px; color: var(--text-dim);
+  min-width: 0;
+  overflow: hidden;
 }
 .slot:hover:not(.locked):not(.filled):not(.cooldown) { border-color: var(--text); background: var(--surface-2); }
 .slot.filled {
@@ -327,6 +336,41 @@ main {
   min-width: 52px; text-align: center;
   font-weight: 600; font-variant-numeric: tabular-nums;
   font-size: 14px; color: var(--text);
+}
+
+/* Slider */
+.settings-slider {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.settings-slider-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.settings-slider-head .value {
+  font-weight: 600; font-variant-numeric: tabular-nums;
+  font-size: 14px; color: var(--text);
+  min-width: 48px; text-align: right;
+}
+.slider {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 4px;
+  background: var(--border);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--text); border: 0; cursor: pointer;
+  transition: transform .12s;
+}
+.slider::-webkit-slider-thumb:hover { transform: scale(1.1); }
+.slider::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--text); border: 0; cursor: pointer;
+}
+.slider::-moz-range-track {
+  height: 4px; background: var(--border); border-radius: 999px;
 }
 
 .hud-tip {

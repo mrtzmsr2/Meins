@@ -47,29 +47,26 @@ function renderSettingsBlock(host) {
         <button type="button" data-step="1" aria-label="mehr">+</button>
       </div>
     </div>
-    <div class="settings-row">
-      <div>
-        <label>Cooldown nach Löschen</label>
-        <span class="hint">Wartezeit nach Löschen, bevor wieder eingetragen werden darf</span>
-      </div>
-      <div class="stepper" data-key="cool">
-        <button type="button" data-step="-5" aria-label="weniger">−</button>
+    <div class="settings-slider">
+      <div class="settings-slider-head">
+        <div>
+          <label for="set-cool-range">Cooldown nach Löschen</label>
+          <span class="hint">Wartezeit, bevor wieder eingetragen werden darf</span>
+        </div>
         <div class="value" id="set-cool-val">${cooldownSec}s</div>
-        <button type="button" data-step="5" aria-label="mehr">+</button>
       </div>
+      <input type="range" id="set-cool-range" class="slider"
+             min="${MIN_COOLDOWN_SEC}" max="${MAX_COOLDOWN_SEC}" step="5" value="${cooldownSec}" />
     </div>
   `;
 
   const slotVal = $('#set-slot-val', host);
   const coolVal = $('#set-cool-val', host);
+  const coolRange = $('#set-cool-range', host);
   const updateDisabled = () => {
     host.querySelectorAll('.stepper[data-key="slot"] button').forEach(b => {
       const step = parseInt(b.dataset.step, 10);
       b.disabled = (step < 0 && slotCount <= MIN_SLOT_COUNT) || (step > 0 && slotCount >= MAX_SLOT_COUNT);
-    });
-    host.querySelectorAll('.stepper[data-key="cool"] button').forEach(b => {
-      const step = parseInt(b.dataset.step, 10);
-      b.disabled = (step < 0 && cooldownSec <= MIN_COOLDOWN_SEC) || (step > 0 && cooldownSec >= MAX_COOLDOWN_SEC);
     });
   };
   host.querySelectorAll('.stepper[data-key="slot"] button').forEach(b => {
@@ -80,13 +77,10 @@ function renderSettingsBlock(host) {
       updateDisabled();
     });
   });
-  host.querySelectorAll('.stepper[data-key="cool"] button').forEach(b => {
-    b.addEventListener('click', () => {
-      cooldownSec = clampCooldownSec(cooldownSec + parseInt(b.dataset.step, 10));
-      coolVal.textContent = `${cooldownSec}s`;
-      store.setSettings({ cooldownSec });
-      updateDisabled();
-    });
+  coolRange.addEventListener('input', () => {
+    cooldownSec = clampCooldownSec(coolRange.value);
+    coolVal.textContent = `${cooldownSec}s`;
+    store.setSettings({ cooldownSec });
   });
   updateDisabled();
 
