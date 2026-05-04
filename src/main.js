@@ -1,5 +1,5 @@
 // MEINS! v4 — main entry, routing, all views.
-import { fmtEUR, fmtNum, escapeHtml, randomId } from './util.js';
+import { fmtEUR, escapeHtml } from './util.js';
 import { store } from './store.js';
 import { createHost, joinHost, makeRoomCode } from './multiplayer.js';
 import {
@@ -15,9 +15,8 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 const tpl = (id) => document.getElementById(id).content.cloneNode(true);
 const app = $('#app');
 
-let mp = null;       // current multiplayer session (host or peer)
-let game = null;     // current game state (single device only — multi state lives on host)
-let lastGame = null; // for "rematch" with same group
+let mp = null;
+let game = null;
 let cooldownTickHandle = null;
 
 function toast(msg, ms = 1800) {
@@ -28,9 +27,9 @@ function toast(msg, ms = 1800) {
 }
 
 // ============================================================
-// SETTINGS UI (slot count + cooldown), pre-game only
+// SETTINGS UI
 // ============================================================
-function renderSettingsBlock(host, { onChange } = {}) {
+function renderSettingsBlock(host) {
   const s = store.getSettings();
   let slotCount = clampSlotCount(s.slotCount ?? 3);
   let cooldownSec = clampCooldownSec(s.cooldownSec ?? 30);
@@ -51,7 +50,7 @@ function renderSettingsBlock(host, { onChange } = {}) {
     <div class="settings-row">
       <div>
         <label>Cooldown nach Löschen</label>
-        <span class="hint">Wartezeit bis ein Spieler nach Löschen wieder eintragen darf</span>
+        <span class="hint">Wartezeit nach Löschen, bevor wieder eingetragen werden darf</span>
       </div>
       <div class="stepper" data-key="cool">
         <button type="button" data-step="-5" aria-label="weniger">−</button>
@@ -73,14 +72,12 @@ function renderSettingsBlock(host, { onChange } = {}) {
       b.disabled = (step < 0 && cooldownSec <= MIN_COOLDOWN_SEC) || (step > 0 && cooldownSec >= MAX_COOLDOWN_SEC);
     });
   };
-
   host.querySelectorAll('.stepper[data-key="slot"] button').forEach(b => {
     b.addEventListener('click', () => {
       slotCount = clampSlotCount(slotCount + parseInt(b.dataset.step, 10));
       slotVal.textContent = slotCount;
       store.setSettings({ slotCount });
       updateDisabled();
-      onChange?.({ slotCount, cooldownSec });
     });
   });
   host.querySelectorAll('.stepper[data-key="cool"] button').forEach(b => {
@@ -89,14 +86,11 @@ function renderSettingsBlock(host, { onChange } = {}) {
       coolVal.textContent = `${cooldownSec}s`;
       store.setSettings({ cooldownSec });
       updateDisabled();
-      onChange?.({ slotCount, cooldownSec });
     });
   });
   updateDisabled();
 
-  return {
-    get values() { return { slotCount, cooldownSec }; },
-  };
+  return { get values() { return { slotCount, cooldownSec }; } };
 }
 
 // ============================================================
@@ -113,11 +107,9 @@ function renderHome() {
     btn.hidden = false;
     btn.textContent = `↻ Letzte Gruppe (${last.players.map(p => p.name).join(', ')})`;
     btn.addEventListener('click', () => {
-      // Rematch always single-device — multi-device groups need a fresh room
       startSingleGame(last.players.map(p => p.name));
     });
   }
-
   $('#btn-new-game').addEventListener('click', renderSetup);
 }
 
@@ -143,13 +135,12 @@ function renderSetup() {
   });
 
   // Single-device setup
-  const players = []; // [{ name }]
+  const players = [];
   const list = $('#single-players');
   const startBtn = $('#single-start');
   const nameInput = $('#single-name');
-
-  // settings (slots + cooldown) shared via store
   const settingsApi = renderSettingsBlock($('#single-settings'));
+
   const refreshList = () => {
     list.innerHTML = '';
     players.forEach((p, i) => {
@@ -213,7 +204,6 @@ function startSingleGame(names, opts = null) {
     cooldownSec: settings.cooldownSec,
   });
   store.setLastGroup({ mode: 'single', players: names.map(n => ({ name: n })) });
-  lastGame = { names: [...names] };
   renderGame();
 }
 
@@ -232,7 +222,6 @@ function refreshGameView() {
   const pr = progress(game);
   $('#game-progress').textContent = `${pr.filled}/${pr.total}`;
 
-  // Leader hint
   const sorted = ranking(game);
   const leader = sorted[0];
   $('#game-leader').innerHTML = leader && leader.total > 0
@@ -246,7 +235,7 @@ function refreshGameView() {
   $('#game-tip').textContent = game.status === 'done'
     ? 'Alle Slots voll — gleich kommt die Auswertung.'
     : (game.mode === 'single'
-        ? 'Tippt einen Slot zum Eintragen. Lange auf einen Slot drücken oder ✕ zum Löschen (Cooldown!).'
+        ? 'Tippt einen Slot zum Eintragen. ✕ auf einem Auto zum Löschen (Cooldown!).'
         : 'Ruft "Meins!" → tippt einen freien Slot bei dir. ✕ zum Löschen (Cooldown!).');
 
   startCooldownTickIfNeeded();
@@ -266,7 +255,6 @@ function startCooldownTickIfNeeded() {
   cooldownTickHandle = setInterval(() => {
     if (!game) { clearInterval(cooldownTickHandle); cooldownTickHandle = null; return; }
     const stillCooling = game.players.some(p => isInCooldown(p));
-    // update DOM lightly: re-render the grid
     if (app.querySelector('.view-game')) {
       const grid = $('#players-grid');
       if (grid) {
@@ -339,7 +327,6 @@ function buildSlot(player, idx, car) {
     return el;
   }
 
-  // Empty slot
   if (!editable) {
     el.classList.add('locked');
     el.innerHTML = `<div class="slot-plus">·</div><div>Slot ${idx + 1}</div>`;
@@ -358,9 +345,9 @@ function buildSlot(player, idx, car) {
     <div class="slot-plus">+</div>
   `;
   el.addEventListener('click', async () => {
-    const car = await openCarSearch(`Auto für ${player.name} eintragen`);
-    if (!car) return;
-    handleAddCar(player.id, idx, car);
+    const c = await openCarSearch(`Auto für ${player.name} eintragen`);
+    if (!c) return;
+    handleAddCar(player.id, idx, c);
   });
   return el;
 }
@@ -368,11 +355,7 @@ function buildSlot(player, idx, car) {
 function canEditSlot(player) {
   if (!game) return false;
   if (game.mode === 'single') return true;
-  // multiplayer:
-  if (mp?.isHost) {
-    return mp.host.peer.id === player.id;
-  }
-  // peer
+  if (mp?.isHost) return mp.host.peer.id === player.id;
   return mp?.myId === player.id;
 }
 
@@ -382,11 +365,9 @@ function handleAddCar(playerId, slotIdx, car) {
     mp.peer.send({ type: 'addCar', playerId, slotIdx, car });
     return;
   }
-  // single or host
   const res = setSlot(game, playerId, slotIdx, car);
   if (!res.ok && res.reason === 'cooldown') {
-    toast('Noch im Cooldown — warte kurz.');
-    return;
+    toast('Noch im Cooldown — warte kurz.'); return;
   }
   if (mp?.isHost) mp.host.broadcast({ type: 'state', state: gameToWire(game) });
   refreshGameView();
@@ -434,7 +415,6 @@ function renderSummary(state) {
 
   $('#summary-rematch').addEventListener('click', () => {
     if (mp?.isHost) {
-      // restart in same room (use latest settings from store)
       const players = game.players.map(p => ({ id: p.id, name: p.name, isHost: p.isHost }));
       const s = store.getSettings();
       game = newGameFromPlayers('multi', players, mp.host.peer.id, {
@@ -445,7 +425,6 @@ function renderSummary(state) {
     } else if (mp && !mp.isHost) {
       toast('Nur der Rundenmeister kann ein neues Spiel starten.');
     } else {
-      // single
       startSingleGame(state.players.map(p => p.name));
     }
   });
@@ -453,7 +432,7 @@ function renderSummary(state) {
 }
 
 // ============================================================
-// MULTIPLAYER FLOWS
+// MULTIPLAYER
 // ============================================================
 async function flowCreateRoom(name) {
   app.innerHTML = '';
@@ -480,7 +459,7 @@ async function flowCreateRoom(name) {
   }
   mp = {
     isHost: true, host,
-    players: [{ id: host.peer.id, name, isHost: true }], // lobby roster
+    players: [{ id: host.peer.id, name, isHost: true }],
   };
   mpRenderRoom();
 }
@@ -495,7 +474,6 @@ function flowJoinRoom(name) {
   setStatus(null);
 
   const input = $('#room-code-input');
-  // Pre-fill if ?room param set
   const param = new URLSearchParams(location.search).get('room');
   if (param) input.value = param.toUpperCase().slice(0, 4);
   input.focus();
@@ -529,20 +507,17 @@ function flowJoinRoom(name) {
 }
 
 function mpRenderRoom() {
-  // Host view of the room (lobby)
   const role = $('#room-role'); role.className = 'mp-role host'; role.textContent = '👑 Du bist Rundenmeister';
-  // Pre-game settings for the host
-  renderSettingsBlock($('#room-settings'));
   $('#room-host-controls').hidden = false;
   $('#room-share').addEventListener('click', () => copyShare(mp.host.roomCode));
   $('#room-start').addEventListener('click', () => mpStartGame());
+  renderSettingsBlock($('#room-settings'));
   mpRefreshLobby();
   setStatus(`Warte auf Mitspieler. Teile den Code: ${mp.host.roomCode}`);
 }
 
 function mpRefreshLobby() {
   if (!mp?.isHost) return;
-  // Sync lobby roster: own + peer connections
   const peerNames = mp.host.listPeers();
   const me = mp.players.find(p => p.isHost) || { id: mp.host.peer.id, name: store.getSettings().name || 'Host', isHost: true };
   mp.players = [me, ...peerNames.map(p => ({ id: p.id, name: p.name, isHost: false }))];
@@ -559,25 +534,26 @@ function mpRefreshLobby() {
     `;
     list.appendChild(row);
   });
-
   $('#room-start').disabled = mp.players.length < 2;
-
-  // Push lobby roster to peers
   mp.host.broadcast({ type: 'lobby', players: mp.players });
 }
 
-fuconst s = store.getSettings();
+function mpStartGame() {
+  if (mp.players.length < 2) { toast('Mindestens 2 Spieler'); return; }
+  const s = store.getSettings();
   game = newGameFromPlayers('multi', mp.players, mp.host.peer.id, {
     slotCount: s.slotCount, cooldownSec: s.cooldownSec,
-  }
-  if (mp.players.length < 2) { toast('Mindestens 2 Spieler'); return; }
-  game = newGameFromPlayers('multi', mp.players, mp.host.peer.id);
-  // Save group
+  });
   store.setLastGroup({ mode: 'multi', players: mp.players.map(p => ({ name: p.name })) });
   mp.host.broadcast({ type: 'state', state: gameToWire(game) });
   renderGame();
 }
-if (peerId !== msg.playerId) return;
+
+function mpHandleHostMsg(peerId, msg) {
+  if (!mp?.isHost) return;
+  if (msg.type === 'addCar') {
+    if (!game) return;
+    if (peerId !== msg.playerId) return;
     const res = setSlot(game, msg.playerId, msg.slotIdx, msg.car);
     if (!res.ok && res.reason === 'cooldown') {
       mp.host.sendTo(peerId, { type: 'denied', reason: 'cooldown' });
@@ -595,11 +571,6 @@ if (peerId !== msg.playerId) return;
     refreshGameView();
   }
   if (msg.type === 'name') {
-    mp.host.broadcast({ type: 'state', state: gameToWire(game) });
-    refreshGameView();
-  }
-  if (msg.type === 'name') {
-    // already handled by transport, just refresh roster
     mpRefreshLobby();
   }
 }
@@ -607,18 +578,31 @@ if (peerId !== msg.playerId) return;
 function mpHandlePeerMsg(msg) {
   if (!mp || mp.isHost) return;
   if (msg.type === 'lobby') {
-    // we're still in the room lobby
     const list = $('#room-players');
     if (!list) return;
     list.innerHTML = '';
     msg.players.forEach(p => {
       const row = document.createElement('div');
+      row.className = 'player-row';
+      if (p.id === mp.myId) row.classList.add('you');
+      row.innerHTML = `
+        <div class="name">${escapeHtml(p.name)}</div>
+        <div class="role-tag ${p.isHost ? 'host' : ''}">${p.isHost ? '👑 Rundenmeister' : 'Spieler'}</div>
+      `;
+      list.appendChild(row);
+    });
+    setStatus('Warte auf Spielstart durch den Rundenmeister…');
+  }
+  if (msg.type === 'state') {
+    game = wireToGame(msg.state);
+    if (!app.querySelector('.view-game')) renderGame();
+    else refreshGameView();
+  }
   if (msg.type === 'denied') {
     if (msg.reason === 'cooldown') toast('Noch im Cooldown — warte kurz.');
   }
 }
 
-// Wire helpers (just JSON copies, kept for clarity)
 function gameToWire(g) {
   return {
     mode: g.mode, status: g.status, hostId: g.hostId,
@@ -637,22 +621,7 @@ function wireToGame(w) {
     players: w.players.map(p => ({
       id: p.id, name: p.name, isHost: !!p.isHost,
       slots: p.slots.slice(), cooldownUntil: p.cooldownUntil || 0,
-   
-    else refreshGameView();
-  }
-}
-
-// Wire helpers (just JSON copies, kept for clarity)
-function gameToWire(g) {
-  return {
-    mode: g.mode, status: g.status, hostId: g.hostId,
-    players: g.players.map(p => ({ id: p.id, name: p.name, isHost: !!p.isHost, slots: p.slots.slice() })),
-  };
-}
-function wireToGame(w) {
-  return {
-    mode: w.mode, status: w.status, hostId: w.hostId,
-    players: w.players.map(p => ({ id: p.id, name: p.name, isHost: !!p.isHost, slots: p.slots.slice() })),
+    })),
   };
 }
 
@@ -661,7 +630,6 @@ function wireToGame(w) {
 // ============================================================
 function setStatus(text, isError = false) {
   const el = $('#room-status');
-  if (cooldownTickHandle) { clearInterval(cooldownTickHandle); cooldownTickHandle = null; }
   if (!el) return;
   if (!text) { el.hidden = true; el.textContent = ''; el.classList.remove('error'); return; }
   el.hidden = false; el.textContent = text;
@@ -687,6 +655,7 @@ function cleanupSession() {
     mp = null;
   }
   game = null;
+  if (cooldownTickHandle) { clearInterval(cooldownTickHandle); cooldownTickHandle = null; }
 }
 
 // Brand → home
@@ -700,10 +669,8 @@ $('#brand-home').addEventListener('click', () => {
 // Auto-join on ?room=XXXX
 const roomParam = new URLSearchParams(location.search).get('room');
 if (roomParam) {
-  // jump into multi-join setup with name prompt
   app.innerHTML = '';
   app.appendChild(tpl('tpl-setup'));
-  // switch to multi pane
   $$('#setup-mode-seg button').forEach(b => {
     b.classList.toggle('active', b.dataset.setupMode === 'multi');
   });
@@ -723,7 +690,6 @@ if (roomParam) {
     store.setSettings({ name: n });
     flowJoinRoom(n);
   });
-  // auto trigger join if name is already saved
   if (myName.value.trim()) flowJoinRoom(myName.value.trim());
 } else {
   renderHome();
