@@ -78,8 +78,33 @@ export async function createHost(roomCode, { onPeerJoin, onPeerLeave, onMessage,
   });
 }
 
-export async function joinHost(roomCode, { onMessage, onClose, onError, name } = {}) {
+export async function joinHost(roomCode, opts = {}) {
+  const { onMessage, onClose, onError, name, onProgress } = opts;
   const Peer = await ensurePeer();
+
+  // Up to 4 attempts with backoff to defeat PeerJS-cloud rate limits
+  const attempts = 4;
+  let lastErr = null;
+  for (let i = 0; i < attempts; i++) {
+    if (i > 0) {
+      const wait = 2000 + i * 1500; // 2s, 3.5s, 5s
+      onProgress?.(`Versuch ${i + 1} von ${attempts}… (PeerJS-Cloud begrenzt — bitte kurz warten)`);
+      await new Promise(r => setTimeout(r, wait));
+    } else {
+      onProgress?.(`Verbinde…`);
+    }
+    try {
+      return await tryJoin(Peer, roomCode, { onMessage, onClose, onError, name });
+    } catch (e) {
+      lastErr = e;
+      // Don't retry if we know the room genuinely doesn't exist
+      if (e && /nicht gefunden/i.test(e.message)) throw e;
+    }
+  }
+  throw lastErr || new Error('Verbindung fehlgeschlagen');
+}
+
+function tryJoin(Peer, roomCode, { onMessage, onClose, onError, name }) {
   return new Promise((resolve, reject) => {
     const peer = new Peer(undefined, { debug: 1 });
     let settled = false;
@@ -91,15 +116,12 @@ export async function joinHost(roomCode, { onMessage, onClose, onError, name } =
       reject(err);
     };
 
-    // Hard timeout — if nothing happens in 15s, give up cleanly
     const timeout = setTimeout(() => {
-      fail(new Error('Zeitüberschreitung beim Verbinden. Code prüfen oder erneut versuchen.'));
-    }, 15000);
+      fail(new Error('Zeitüberschreitung beim Verbinden.'));
+    }, 12000);
 
     peer.on('open', () => {
       const conn = peer.connect(PREFIX + roomCode, { reliable: true });
-
-      // If conn never opens (e.g. host gone or NAT issue), keep timeout alive
       conn.on('open', () => {
         if (settled) return;
         settled = true;
@@ -121,10 +143,12 @@ export async function joinHost(roomCode, { onMessage, onClose, onError, name } =
 
     peer.on('error', (err) => {
       if (settled) { onError?.(err); return; }
-      if (err && err.type === 'peer-unavailable') fail(new Error('Raum nicht gefunden. Code prüfen.'));
-      else if (err && err.type === 'network') fail(new Error('Netzwerk-Fehler. Internetverbindung prüfen.'));
-      else if (err && err.type === 'server-error') fail(new Error('PeerJS-Server nicht erreichbar. Bitte erneut versuchen.'));
-      else fail(err instanceof Error ? err : new Error(err?.message || 'Verbindung fehlgeschlagen'));
+      const t = err && err.type;
+      if (t === 'peer-unavailable') fail(new Error('Raum nicht gefunden. Code prüfen.'));
+      else if (t === 'network') fail(new Error('Netzwerk-Fehler. Internetverbindung prüfen.'));
+      else if (t === 'server-error' || t === 'socket-error' || /usage|limit/i.test(err?.message || '')) {
+        fail(new Error('PeerJS-Cloud begrenzt — Retry läuft…'));
+      } else fail(err instanceof Error ? err : new Error(err?.message || 'Verbindung fehlgeschlagen'));
     });
   });
 }

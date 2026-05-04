@@ -473,6 +473,7 @@ function flowJoinRoom(name) {
         onMessage: (msg) => mpHandlePeerMsg(msg),
         onClose: () => { toast('Verbindung beendet'); renderHome(); },
         onError: (err) => console.warn('peer error', err),
+        onProgress: (text) => setStatus(text),
       });
       mp = { isHost: false, peer, myId: peer.peer.id, myName: name };
       $('#room-code').textContent = code;
