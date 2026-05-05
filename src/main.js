@@ -366,6 +366,57 @@ function handleClearSlot(playerId, slotIdx) {
 }
 
 // ============================================================
+// DOWNLOAD ZIP
+// ============================================================
+function downloadResultsZip(state) {
+  const sorted = ranking(state);
+  const date = new Date().toLocaleDateString('de-DE');
+
+  // Plain-text summary
+  let txt = `MEINS! – Spielergebnis vom ${date}\n${'='.repeat(40)}\n\n`;
+  sorted.forEach((p, i) => {
+    const medal = ['🥇','🥈','🥉'][i] || `#${i + 1}`;
+    txt += `${medal} ${p.name} — ${fmtEUR(p.total)}\n`;
+    p.slots.filter(Boolean).forEach(c => {
+      txt += `   ${c.emoji || '🚗'} ${c.brand} ${c.model}: ${fmtEUR(c.price)}\n`;
+    });
+    txt += '\n';
+  });
+
+  // HTML summary
+  const rows = sorted.map((p, i) => {
+    const medal = ['🥇','🥈','🥉'][i] || `#${i + 1}`;
+    const cars = p.slots.filter(Boolean).map(c =>
+      `<li>${escapeHtml(c.emoji || '🚗')} ${escapeHtml(c.brand)} ${escapeHtml(c.model)} — ${escapeHtml(fmtEUR(c.price))}</li>`
+    ).join('');
+    return `<tr><td>${medal}</td><td><strong>${escapeHtml(p.name)}</strong><ul>${cars}</ul></td><td>${escapeHtml(fmtEUR(p.total))}</td></tr>`;
+  }).join('');
+  const html = `<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8"><title>MEINS! Ergebnis</title>
+<style>body{font-family:system-ui,sans-serif;max-width:600px;margin:2rem auto;padding:0 1rem}
+table{width:100%;border-collapse:collapse}td{padding:10px 8px;vertical-align:top;border-bottom:1px solid #ddd}
+ul{margin:4px 0;padding-left:18px}h1{font-size:1.5rem}</style>
+</head><body>
+<h1>🏆 MEINS! – Ergebnis vom ${escapeHtml(date)}</h1>
+<table><thead><tr><th></th><th>Spieler</th><th>Gesamt</th></tr></thead>
+<tbody>${rows}</tbody></table>
+</body></html>`;
+
+  /* global JSZip */
+  const zip = new JSZip();
+  zip.file('ergebnis.txt', txt);
+  zip.file('ergebnis.html', html);
+  zip.generateAsync({ type: 'blob' }).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `meins-ergebnis-${date.replace(/\./g, '-')}.zip`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  });
+}
+
+// ============================================================
 // SUMMARY
 // ============================================================
 function renderSummary(state) {
@@ -392,6 +443,8 @@ function renderSummary(state) {
     `;
     list.appendChild(row);
   });
+
+  $('#summary-download').addEventListener('click', () => downloadResultsZip(state));
 
   $('#summary-rematch').addEventListener('click', () => {
     if (mp?.isHost) {
