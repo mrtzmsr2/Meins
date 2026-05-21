@@ -594,25 +594,35 @@ function handleAddCar(playerId, slotIdx, car) {
   // Optionales Beweis-Foto -> Sammlung (nur Single-Device)
   if (game.mode === 'single') {
     const player = game.players.find(p => p.id === playerId);
-    askPhotoAndCollect(car, player?.name).catch(e => console.warn('[photo]', e));
+    askPhotoAndCollect(car, player?.name).then((collectionId) => {
+      if (!collectionId || !game) return;
+      const pl = game.players.find(p => p.id === playerId);
+      const slot = pl?.slots?.[slotIdx];
+      if (slot && slot.brand === car.brand && slot.model === car.model && Number(slot.price) === Number(car.price)) {
+        slot.collectionId = collectionId;
+        persistGame();
+      }
+    }).catch(e => console.warn('[photo]', e));
   }
 }
 
 async function askPhotoAndCollect(car, playerName) {
   const want = await openPhotoPrompt();
-  if (!want) return;
+  if (!want) return null;
   const dataUrl = await pickAndCompressPhoto();
-  if (!dataUrl) { toast(TEXT.photoMissing()); return; }
+  if (!dataUrl) { toast(TEXT.photoMissing()); return null; }
   try {
-    await collection.addEntry({
+    const id = await collection.addEntry({
       brand: car.brand, model: car.model, price: car.price,
       dataUrl, playerName: playerName || null,
     });
     toast(TEXT.collectionAdded());
     haptic.success();
+    return id;
   } catch (e) {
     console.warn('[collection]', e);
     toast(TEXT.saveError());
+    return null;
   }
 }
 
@@ -645,9 +655,16 @@ function handleClearSlot(playerId, slotIdx) {
     mp.peer.send({ type: 'removeCar', playerId, slotIdx });
     return;
   }
+  // Vor dem Loeschen: zugehoerige Sammlungs-Eintrags-ID merken
+  const player = game.players.find(p => p.id === playerId);
+  const collectionId = player?.slots?.[slotIdx]?.collectionId || null;
   const res = clearSlot(game, playerId, slotIdx);
   if (!res.ok) return;
   if (mp?.isHost) mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+  // Aus der Sammlung entfernen, falls verknuepft (nur Single-Device)
+  if (collectionId && game.mode === 'single') {
+    collection.removeEntry(collectionId).catch(e => console.warn('[collection]', e));
+  }
   sounds.remove();
   haptic.light();
   persistGame();
@@ -1389,11 +1406,15 @@ if (roomParam) {
   renderHome();
 }
 
-// Splash ausblenden
+// Splash ausblenden — sofort nach erstem Render. Tap blendet ebenfalls aus.
 requestAnimationFrame(() => {
   const splash = document.getElementById('app-splash');
-  if (splash) {
+  if (!splash) return;
+  const hide = () => {
     splash.classList.add('app-splash--hide');
     setTimeout(() => splash.remove(), 600);
-  }
+  };
+  splash.addEventListener('click', hide, { once: true });
+  splash.addEventListener('touchstart', hide, { once: true, passive: true });
+  hide();
 });
