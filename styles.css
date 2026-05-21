@@ -115,12 +115,20 @@ main {
 .seg button.active { background: var(--surface-2); color: var(--text); }
 
 /* ====================== HOME ====================== */
-.view-home { display: flex; flex-direction: column; gap: 22px; }
+.view-home { display: flex; flex-direction: column; gap: 18px; }
 .hero-logo {
   display: block;
-  width: 100%; max-width: 360px;
-  margin: 16px auto 0;
+  width: 100%; max-width: 240px;
+  margin: 4px auto 0;
   height: auto;
+}
+/* Auf PWA / kleinen Screens noch kompakter, da der Topbar-Logo bereits sichtbar ist */
+@media (display-mode: standalone), (max-height: 760px) {
+  .hero-logo { max-width: 180px; margin-top: 0; }
+  .view-home { gap: 14px; }
+}
+@media (display-mode: standalone) and (max-height: 700px) {
+  .hero-logo { display: none; }
 }
 .hero-title {
   font-size: clamp(40px, 10vw, 72px);

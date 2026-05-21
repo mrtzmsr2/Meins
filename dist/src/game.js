@@ -83,10 +83,9 @@ export function setSlot(state, playerId, slotIndex, car) {
 }
 
 /**
- * Remove a car. Triggers a STACKING cooldown:
- * - 1. Loeschung: cooldownSec
- * - 2. Loeschung in Folge: cooldownSec * 2 (oben drauf, falls noch im Cooldown)
- * - 3. Loeschung in Folge: cooldownSec * 3, usw.
+ * Remove a car. Triggers an ADDITIVE cooldown:
+ * - Jede Loeschung haengt cooldownSec oben drauf (egal ob 1., 2. oder 3. mal).
+ * - Streak wird trotzdem getrackt fuer die Anzeige ("warum dauert das so lange").
  * Streak laeuft aus, wenn nach Cooldown-Ende eine Karenzzeit (2x cooldownSec)
  * ohne weitere Loeschung vergeht.
  */
@@ -102,9 +101,8 @@ export function clearSlot(state, playerId, slotIndex) {
     const cdMs = state.cooldownSec * 1000;
     const decayAt = p.streakDecayAt || 0;
     const streak = (now > decayAt) ? 1 : ((p.deleteStreak || 0) + 1);
-    const addMs = cdMs * streak;
     const base = Math.max(now, p.cooldownUntil || 0);
-    p.cooldownUntil = base + addMs;
+    p.cooldownUntil = base + cdMs;
     p.deleteStreak = streak;
     p.streakDecayAt = p.cooldownUntil + cdMs * 2;
   }
@@ -115,10 +113,7 @@ export function clearSlot(state, playerId, slotIndex) {
 export function nextCooldownSec(state, player) {
   const cdSec = state.cooldownSec || 0;
   if (cdSec <= 0) return 0;
-  const now = Date.now();
-  const decayAt = player.streakDecayAt || 0;
-  const streak = (now > decayAt) ? 1 : ((player.deleteStreak || 0) + 1);
-  return cdSec * streak;
+  return cdSec;
 }
 
 export function allSlotsFilled(state) {
