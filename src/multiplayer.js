@@ -2,6 +2,20 @@
 const PREFIX = 'meins-v4-';
 const ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 
+// STUN+TURN-Server fuer NAT-Traversal. Ohne TURN scheitern Verbindungen,
+// wenn Host und Joiner in unterschiedlichen Mobilfunk-/Symmetric-NATs sind.
+// Open Relay (Metered) ist kostenlos und ohne Account nutzbar.
+const ICE_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:openrelay.metered.ca:80' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+  ],
+};
+const PEER_OPTS = { debug: 1, config: ICE_CONFIG };
+
 export function makeRoomCode() {
   let s = '';
   for (let i = 0; i < 4; i++) s += ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)];
@@ -24,7 +38,7 @@ function ensurePeer() {
 export async function createHost(roomCode, { onPeerJoin, onPeerLeave, onMessage, onError } = {}) {
   const Peer = await ensurePeer();
   return new Promise((resolve, reject) => {
-    const peer = new Peer(PREFIX + roomCode, { debug: 1 });
+    const peer = new Peer(PREFIX + roomCode, PEER_OPTS);
     const conns = new Map();
     let openResolved = false;
 
@@ -106,7 +120,7 @@ export async function joinHost(roomCode, opts = {}) {
 
 function tryJoin(Peer, roomCode, { onMessage, onClose, onError, name }) {
   return new Promise((resolve, reject) => {
-    const peer = new Peer(undefined, { debug: 1 });
+    const peer = new Peer(undefined, PEER_OPTS);
     let settled = false;
 
     const fail = (err) => {
