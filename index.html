@@ -8,6 +8,11 @@
   <meta name="description" content="Das Autospiel: 'Meins!' rufen, Auto sichern, Preis nachschlagen. Wer die teuerste Sammlung hat, gewinnt." />
   <link rel="icon" href="./assets/logo.png" type="image/png" />
   <link rel="apple-touch-icon" href="./assets/logo.png" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MEINS!" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <link rel="stylesheet" href="./styles.css" />
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" defer></script>
 </head>
@@ -203,5 +208,15 @@
   </template>
 
   <script type="module" src="./src/main.js"></script>
+  <script>
+    // Service-Worker registrieren (PWA / Offline)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(err => {
+          console.warn('SW registration failed', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

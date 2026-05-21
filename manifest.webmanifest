@@ -1,0 +1,33 @@
+{
+  "name": "MEINS! — Wer sammelt die teuersten Autos?",
+  "short_name": "MEINS!",
+  "description": "Das Autospiel: 'Meins!' rufen, Auto sichern, Preis nachschlagen. Wer die teuerste Sammlung hat, gewinnt.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0a",
+  "theme_color": "#05070b",
+  "lang": "de",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "./assets/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
