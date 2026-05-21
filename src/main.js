@@ -1342,7 +1342,7 @@ function cleanupSession() {
 }
 
 // Brand → home
-$('#brand-home').addEventListener('click', () => {
+$('#brand-home').addEventListener('click', async () => {
   if (game && game.status === 'playing') {
     if (!(await customConfirm(CONFIRM.leaveMulti))) return;
   }
