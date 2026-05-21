@@ -32,17 +32,23 @@ export function clampCooldownSec(v) {
   return Math.max(MIN_COOLDOWN_SEC, Math.min(MAX_COOLDOWN_SEC, n));
 }
 
-/** Build a fresh state from a list of player names. */
+/** Build a fresh state from a list of player names (or {name,avatar} objects). */
 export function newGame(mode, names, hostId = null, opts = {}) {
   const slotCount = clampSlotCount(opts.slotCount);
   const cooldownSec = clampCooldownSec(opts.cooldownSec);
-  const players = names.map((name, i) => ({
-    id: hostId && i === 0 ? hostId : randomId(),
-    name: String(name).slice(0, 20).trim() || `Spieler ${i + 1}`,
-    slots: Array(slotCount).fill(null),
-    isHost: hostId ? i === 0 : false,
-    cooldownUntil: 0,
-  }));
+  const players = names.map((entry, i) => {
+    const isObj = entry && typeof entry === 'object';
+    const name = String(isObj ? entry.name : entry).slice(0, 20).trim() || `Spieler ${i + 1}`;
+    const avatar = isObj ? (entry.avatar || null) : null;
+    return {
+      id: hostId && i === 0 ? hostId : randomId(),
+      name,
+      avatar,
+      slots: Array(slotCount).fill(null),
+      isHost: hostId ? i === 0 : false,
+      cooldownUntil: 0,
+    };
+  });
   return { mode, status: 'playing', players, hostId: hostId || null, slotCount, cooldownSec };
 }
 
@@ -55,6 +61,7 @@ export function newGameFromPlayers(mode, players, hostId, opts = {}) {
     status: 'playing',
     players: players.map(p => ({
       id: p.id, name: p.name, isHost: !!p.isHost,
+      avatar: p.avatar || null,
       slots: Array(slotCount).fill(null),
       cooldownUntil: 0,
     })),

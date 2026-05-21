@@ -2,10 +2,11 @@
 const KEY = 'meins.v4.store';
 
 const defaults = () => ({
-  lastGroup: null,           // { mode: 'single'|'multi', players: [{name}] }
+  lastGroup: null,           // { mode: 'single'|'multi', players: [{name, avatar?}] }
   customCars: [],            // user-added cars added via manual entry
   settings: { name: '', slotCount: 3, cooldownSec: 30 },
   savedGame: null,           // persistierter Single-Device-Spielstand
+  groups: [],                // benannte gespeicherte Gruppen [{id,name,players:[{name,avatar}],createdAt}]
 });
 
 let cache = null;
@@ -18,6 +19,7 @@ function read() {
   } catch { cache = defaults(); }
   cache.settings = { ...defaults().settings, ...cache.settings };
   if (!Array.isArray(cache.customCars)) cache.customCars = [];
+  if (!Array.isArray(cache.groups)) cache.groups = [];
   return cache;
 }
 function write() { try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch {} }
@@ -50,4 +52,36 @@ export const store = {
     write();
   },
   clearSavedGame() { const s = read(); s.savedGame = null; write(); },
+
+  // Benannte Gruppen
+  getGroups: () => read().groups.slice().sort((a, b) => (b.usedAt || b.createdAt || 0) - (a.usedAt || a.createdAt || 0)),
+  saveGroup(name, players) {
+    const s = read();
+    const trimmed = String(name || '').trim().slice(0, 30);
+    if (!trimmed || !Array.isArray(players) || players.length < 2) return null;
+    const id = `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const grp = {
+      id,
+      name: trimmed,
+      players: players.map(p => ({ name: String(p.name || '').slice(0, 20), avatar: p.avatar || null })),
+      createdAt: Date.now(),
+      usedAt: Date.now(),
+    };
+    // Replace if same name exists
+    s.groups = s.groups.filter(g => g.name.toLowerCase() !== trimmed.toLowerCase());
+    s.groups.unshift(grp);
+    s.groups = s.groups.slice(0, 30);
+    write();
+    return grp;
+  },
+  touchGroup(id) {
+    const s = read();
+    const g = s.groups.find(g => g.id === id);
+    if (g) { g.usedAt = Date.now(); write(); }
+  },
+  deleteGroup(id) {
+    const s = read();
+    s.groups = s.groups.filter(g => g.id !== id);
+    write();
+  },
 };

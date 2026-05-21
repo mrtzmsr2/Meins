@@ -19,11 +19,13 @@
       <img class="brand-logo" src="./assets/logo.png" alt="MEINS!" />
     </div>
     <nav class="nav" id="topnav">
+      <button class="icon-btn nav-btn" id="btn-theme" type="button" aria-label="Hell/Dunkel-Modus" title="Hell/Dunkel">🌙</button>
       <button class="icon-btn nav-btn" id="btn-mute" type="button" aria-label="Sound an/aus" title="Sound">🔊</button>
     </nav>
   </header>
 
   <main id="app"></main>
+  <div id="aria-live" class="sr-only" role="status" aria-live="polite"></div>
 
   <!-- ============== HOME ============== -->
   <template id="tpl-home">
@@ -34,6 +36,11 @@
       <div class="home-actions">
         <button class="primary big" id="btn-new-game">🏁 Neues Spiel</button>
         <button class="secondary" id="btn-rematch" hidden>↻ Letzte Gruppe wieder spielen</button>
+      </div>
+
+      <div class="home-groups" id="home-groups" hidden>
+        <h3>Gespeicherte Gruppen</h3>
+        <div class="groups-list" id="groups-list"></div>
       </div>
 
       <div class="rules">
@@ -64,6 +71,7 @@
         <div class="player-list" id="single-players"></div>
         <div class="settings-block" id="single-settings"></div>
         <button class="primary big" id="single-start" disabled>Spiel starten</button>
+        <button type="button" class="ghost-link" id="single-save-group" hidden>💾 Als Gruppe speichern</button>
         <button type="button" class="ghost-link mode-switch" id="switch-to-multi">📡 Lieber auf mehreren Geräten spielen?</button>
       </div>
 

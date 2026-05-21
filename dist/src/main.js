@@ -11,8 +11,11 @@ import {
 import { openCarSearch } from './car-search.js';
 import { brandBadgeHTML } from './brands.js';
 import { sounds, haptic } from './sounds.js';
+import { AVATAR_POOL, nextAvatar, avatarHTML } from './avatars.js';
+import { theme, applyTheme } from './theme.js';
 
 sounds.load();
+applyTheme();
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -29,7 +32,16 @@ function toast(msg, ms = 1800) {
   const el = document.createElement('div');
   el.className = 'toast'; el.textContent = msg;
   document.body.appendChild(el);
+  announce(msg);
   setTimeout(() => el.remove(), ms);
+}
+
+function announce(msg) {
+  const r = document.getElementById('aria-live');
+  if (!r) return;
+  r.textContent = '';
+  // Kurzer Reset, damit Screenreader die Änderung wahrnimmt
+  setTimeout(() => { r.textContent = msg; }, 30);
 }
 
 // Single-Device-Spielstand speichern/laden
@@ -122,6 +134,7 @@ function renderHome() {
           status: saved.status,
           players: saved.players.map(p => ({
             id: p.id, name: p.name, isHost: !!p.isHost,
+            avatar: p.avatar || null,
             slots: Array.isArray(p.slots) ? p.slots.slice() : [],
             cooldownUntil: p.cooldownUntil || 0,
           })),
@@ -154,10 +167,42 @@ function renderHome() {
     btn.hidden = false;
     btn.textContent = `↻ Letzte Gruppe (${last.players.map(p => p.name).join(', ')})`;
     btn.addEventListener('click', () => {
-      startSingleGame(last.players.map(p => p.name));
+      startSingleGame(last.players.map(p => ({ name: p.name, avatar: p.avatar || null })));
     });
   }
   $('#btn-new-game').addEventListener('click', renderSetup);
+
+  // Gespeicherte Gruppen
+  const groups = store.getGroups();
+  const groupsHost = $('#home-groups');
+  const groupsList = $('#groups-list');
+  if (groups.length > 0 && groupsHost && groupsList) {
+    groupsHost.hidden = false;
+    groupsList.innerHTML = '';
+    groups.forEach(g => {
+      const card = document.createElement('div');
+      card.className = 'group-card';
+      const avatars = g.players.map(p => `<span class="group-card-avatar">${p.avatar || '🚗'}</span>`).join('');
+      card.innerHTML = `
+        <button type="button" class="group-card-main" aria-label="Gruppe ${escapeHtml(g.name)} starten">
+          <div class="group-card-name">${escapeHtml(g.name)}</div>
+          <div class="group-card-players">${avatars}<span class="group-card-count">${g.players.length} Spieler</span></div>
+        </button>
+        <button type="button" class="group-card-del" aria-label="Gruppe ${escapeHtml(g.name)} löschen" title="Gruppe löschen">✕</button>
+      `;
+      card.querySelector('.group-card-main').addEventListener('click', () => {
+        store.touchGroup(g.id);
+        startSingleGame(g.players.map(p => ({ name: p.name, avatar: p.avatar || null })));
+      });
+      card.querySelector('.group-card-del').addEventListener('click', () => {
+        if (confirm(`Gruppe „${g.name}" löschen?`)) {
+          store.deleteGroup(g.id);
+          renderHome();
+        }
+      });
+      groupsList.appendChild(card);
+    });
+  }
 }
 
 // ============================================================
@@ -180,6 +225,7 @@ function renderSetup() {
   const list = $('#single-players');
   const startBtn = $('#single-start');
   const nameInput = $('#single-name');
+  const saveGroupBtn = $('#single-save-group');
   const settingsApi = renderSettingsBlock($('#single-settings'));
 
   const refreshList = () => {
@@ -188,8 +234,9 @@ function renderSetup() {
       const row = document.createElement('div');
       row.className = 'player-row';
       row.innerHTML = `
+        <button type="button" class="avatar-btn" data-i="${i}" aria-label="Avatar wechseln">${avatarHTML(p.avatar, 'md')}</button>
         <div class="name">${escapeHtml(p.name)}</div>
-        <button class="remove" aria-label="Entfernen" data-i="${i}">✕</button>
+        <button class="remove" aria-label="${escapeHtml(p.name)} entfernen" data-i="${i}">✕</button>
       `;
       list.appendChild(row);
     });
@@ -198,7 +245,15 @@ function renderSetup() {
         players.splice(parseInt(b.dataset.i, 10), 1); refreshList();
       });
     });
+    list.querySelectorAll('.avatar-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        const i = parseInt(b.dataset.i, 10);
+        cycleAvatar(players, i);
+        refreshList();
+      });
+    });
     startBtn.disabled = players.length < 2;
+    if (saveGroupBtn) saveGroupBtn.hidden = players.length < 2;
   };
   $('#single-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -208,12 +263,20 @@ function renderSetup() {
       toast('Name bereits vergeben'); return;
     }
     if (players.length >= 8) { toast('Maximal 8 Spieler'); return; }
-    players.push({ name: v.slice(0, 20) });
+    players.push({ name: v.slice(0, 20), avatar: nextAvatar(players.map(p => p.avatar)) });
     nameInput.value = '';
     nameInput.focus();
     refreshList();
   });
-  startBtn.addEventListener('click', () => startSingleGame(players.map(p => p.name), settingsApi.values));
+  startBtn.addEventListener('click', () => startSingleGame(players.slice(), settingsApi.values));
+
+  saveGroupBtn?.addEventListener('click', () => {
+    if (players.length < 2) return;
+    const name = prompt('Name der Gruppe?', players.map(p => p.name).join(' & ').slice(0, 30));
+    if (!name) return;
+    const g = store.saveGroup(name, players);
+    if (g) { toast(`Gruppe „${g.name}" gespeichert`); haptic.success(); }
+  });
 
   // Multi-device setup
   const myName = $('#multi-name');
@@ -237,14 +300,31 @@ function renderSetup() {
 // ============================================================
 // SINGLE-DEVICE GAME
 // ============================================================
-function startSingleGame(names, opts = null) {
-  if (names.length < 2) { toast('Mindestens 2 Spieler'); return; }
+function cycleAvatar(players, i) {
+  const cur = players[i].avatar;
+  const used = new Set(players.map((p, j) => j !== i ? p.avatar : null).filter(Boolean));
+  const idx = AVATAR_POOL.indexOf(cur);
+  for (let k = 1; k <= AVATAR_POOL.length; k++) {
+    const cand = AVATAR_POOL[(idx + k) % AVATAR_POOL.length];
+    if (!used.has(cand)) { players[i].avatar = cand; return; }
+  }
+  players[i].avatar = AVATAR_POOL[(idx + 1) % AVATAR_POOL.length];
+}
+
+function startSingleGame(playersInput, opts = null) {
+  // playersInput kann Array<string> oder Array<{name,avatar}> sein.
+  const arr = (playersInput || []).map(p => typeof p === 'string' ? { name: p, avatar: null } : p);
+  if (arr.length < 2) { toast('Mindestens 2 Spieler'); return; }
+  // Avatare auffüllen
+  arr.forEach((p, i) => {
+    if (!p.avatar) p.avatar = nextAvatar(arr.slice(0, i).map(q => q.avatar));
+  });
   const settings = opts || store.getSettings();
-  game = newGame('single', names, null, {
+  game = newGame('single', arr, null, {
     slotCount: settings.slotCount,
     cooldownSec: settings.cooldownSec,
   });
-  store.setLastGroup({ mode: 'single', players: names.map(n => ({ name: n })) });
+  store.setLastGroup({ mode: 'single', players: arr.map(p => ({ name: p.name, avatar: p.avatar })) });
   clearPersistedGame();
   gameStartedAt = Date.now();
   persistGame();
@@ -280,6 +360,7 @@ function refreshGameView() {
       mini.innerHTML = sorted.map((p, i) => `
         <div class="mini-rank-row${i === 0 ? ' lead' : ''}">
           <span class="mini-rank-pos">${i + 1}.</span>
+          ${avatarHTML(p.avatar, 'sm')}
           <span class="mini-rank-name">${escapeHtml(p.name)}</span>
           <span class="mini-rank-total">${fmtEUR(p.total)}</span>
         </div>
@@ -359,7 +440,7 @@ function buildPlayerCard(player) {
   card.innerHTML = `
     <div class="player-card-head">
       <div class="player-card-name">
-        ${player.isHost ? '<span class="crown">👑</span>' : ''}${escapeHtml(player.name)}${isYou ? ' <span style="color:var(--text-dim);font-size:12px;font-weight:500;">(du)</span>' : ''}${cooldownBadge}
+        ${avatarHTML(player.avatar, 'md')}${player.isHost ? '<span class="crown">👑</span>' : ''}<span class="player-card-name-text">${escapeHtml(player.name)}</span>${isYou ? ' <span style="color:var(--text-dim);font-size:12px;font-weight:500;">(du)</span>' : ''}${cooldownBadge}
       </div>
       <div class="player-card-total">${fmtEUR(total)}</div>
     </div>
@@ -515,7 +596,7 @@ function renderSummary(state) {
     row.innerHTML = `
       <div class="rank-medal">${medal}</div>
       <div>
-        <div class="rank-name">${escapeHtml(p.name)}</div>
+        <div class="rank-name">${avatarHTML(p.avatar, 'sm')} ${escapeHtml(p.name)}</div>
         <div class="rank-cars">${escapeHtml(cars)}</div>
       </div>
       <div class="rank-total">${fmtEUR(p.total)}</div>
@@ -796,6 +877,22 @@ muteBtn?.addEventListener('click', () => {
   sounds.setMuted(!sounds.isMuted());
   refreshMuteBtn();
   if (!sounds.isMuted()) sounds.tap();
+});
+
+// Theme-Toggle
+const themeBtn = document.getElementById('btn-theme');
+function refreshThemeBtn() {
+  if (!themeBtn) return;
+  const eff = theme.getEffective();
+  themeBtn.textContent = eff === 'light' ? '☀️' : '🌙';
+  themeBtn.setAttribute('aria-pressed', eff === 'light' ? 'true' : 'false');
+  themeBtn.title = eff === 'light' ? 'Dunkel-Modus' : 'Hell-Modus';
+}
+refreshThemeBtn();
+themeBtn?.addEventListener('click', () => {
+  theme.toggle();
+  refreshThemeBtn();
+  haptic.light();
 });
 
 // Auto-join on ?room=XXXX
