@@ -1,70 +1,63 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MEINS!">
   <defs>
-    <!-- Tiefenverlauf mit leichtem Blauton fuer "premium" Look -->
     <linearGradient id="m-bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"  stop-color="#1d2436"/>
-      <stop offset="55%" stop-color="#0c0f17"/>
-      <stop offset="100%" stop-color="#05070b"/>
+      <stop offset="0%"  stop-color="#1c1c1c"/>
+      <stop offset="100%" stop-color="#080808"/>
     </linearGradient>
-    <linearGradient id="m-accent" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"  stop-color="#fff2a0"/>
-      <stop offset="50%" stop-color="#ffd84d"/>
-      <stop offset="100%" stop-color="#f0b400"/>
+    <linearGradient id="m-red" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#ff4d4d"/>
+      <stop offset="100%" stop-color="#c81e1e"/>
     </linearGradient>
     <linearGradient id="m-shine" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.13"/>
       <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
-    <linearGradient id="m-stripe" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%"  stop-color="#ffd84d" stop-opacity="0"/>
-      <stop offset="50%" stop-color="#ffd84d" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="#ffd84d" stop-opacity="0"/>
-    </linearGradient>
-    <filter id="m-glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="5" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
+    <clipPath id="m-band-clip">
+      <rect width="300" height="40" rx="4" ry="4"/>
+    </clipPath>
   </defs>
 
   <!-- App-Tile -->
   <rect width="512" height="512" rx="104" ry="104" fill="url(#m-bg)"/>
 
-  <!-- Diagonale Speed-Streifen -->
-  <g>
-    <polygon points="-20,420 200,140 270,140 50,420"  fill="url(#m-stripe)"/>
-    <polygon points="80,440 300,160 350,160 130,440"  fill="url(#m-stripe)"/>
-  </g>
-
-  <!-- Glas-Reflex oben -->
+  <!-- Glas-Reflex -->
   <rect x="32" y="32" width="448" height="180" rx="80" fill="url(#m-shine)"/>
 
   <!-- Innere Highlight-Kontur -->
   <rect x="6" y="6" width="500" height="500" rx="98" fill="none"
         stroke="#ffffff" stroke-opacity="0.07" stroke-width="2"/>
 
-  <!-- Wordmark - textLength fixiert auf 400, "!" ragt nie raus -->
-  <g filter="url(#m-glow)">
-    <text x="256" y="296" text-anchor="middle"
-          textLength="400" lengthAdjust="spacingAndGlyphs"
-          font-family="'Arial Black', 'Helvetica Neue', Helvetica, Arial, sans-serif"
-          font-weight="900" font-size="146" letter-spacing="-2">
-      <tspan fill="#ffffff">MEINS</tspan><tspan fill="url(#m-accent)">!</tspan>
-    </text>
-  </g>
+  <!-- Wordmark - textLength fixiert auf 400px -->
+  <text x="256" y="276" text-anchor="middle"
+        textLength="400" lengthAdjust="spacingAndGlyphs"
+        font-family="'Arial Black', 'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-weight="900" font-size="146" letter-spacing="-2">
+    <tspan fill="#ffffff">MEINS</tspan><tspan fill="url(#m-red)">!</tspan>
+  </text>
 
-  <!-- Speed-Pfeil (Underline mit Spitze) -->
-  <g>
-    <rect x="92" y="332" width="296" height="14" rx="7" fill="url(#m-accent)"/>
-    <polygon points="386,322 422,339 386,356" fill="url(#m-accent)"/>
+  <!-- Karierte Zielflagge -->
+  <g transform="translate(106 314)" clip-path="url(#m-band-clip)">
+    <rect width="300" height="40" fill="#ffffff"/>
+    <g fill="#0a0a0a">
+      <rect x="0"   y="0"  width="25" height="20"/>
+      <rect x="50"  y="0"  width="25" height="20"/>
+      <rect x="100" y="0"  width="25" height="20"/>
+      <rect x="150" y="0"  width="25" height="20"/>
+      <rect x="200" y="0"  width="25" height="20"/>
+      <rect x="250" y="0"  width="25" height="20"/>
+      <rect x="25"  y="20" width="25" height="20"/>
+      <rect x="75"  y="20" width="25" height="20"/>
+      <rect x="125" y="20" width="25" height="20"/>
+      <rect x="175" y="20" width="25" height="20"/>
+      <rect x="225" y="20" width="25" height="20"/>
+      <rect x="275" y="20" width="25" height="20"/>
+    </g>
   </g>
 
   <!-- Tagline -->
-  <text x="256" y="402" text-anchor="middle"
+  <text x="256" y="408" text-anchor="middle"
         font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
-        font-weight="800" font-size="30" fill="#9aa3b0" letter-spacing="8">
+        font-weight="800" font-size="30" fill="#9a9a9a" letter-spacing="8">
     DAS AUTOSPIEL
   </text>
 </svg>
