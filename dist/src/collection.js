@@ -1,4 +1,4 @@
-// Persistente langfristige Sammlung — nur Eintraege MIT Foto.
+// Persistente langfristige Sammlung — nur Einträge MIT Foto.
 // Metadaten in localStorage, Bilder in IndexedDB (siehe photos.js).
 import { addPhoto, deletePhoto } from './photos.js';
 import { CARS } from './data/cars.js';

@@ -1105,3 +1105,322 @@ body {
   /* Toasts ueber Home-Indicator anheben */
   bottom: calc(20px + env(safe-area-inset-bottom)) !important;
 }
+
+/* ============================================================
+   App-Splash (zeigt sich vor dem ersten Render)
+   ============================================================ */
+#app-splash {
+  position: fixed; inset: 0; z-index: 999;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 18px;
+  background: var(--bg, #0a0a0a);
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+#app-splash img {
+  width: min(60vw, 220px); height: auto;
+  filter: drop-shadow(0 6px 20px rgba(0,0,0,0.5));
+  animation: app-splash-pulse 1.6s ease-in-out infinite alternate;
+}
+.app-splash-tagline {
+  font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+}
+.app-splash--hide { opacity: 0; visibility: hidden; pointer-events: none; }
+@keyframes app-splash-pulse {
+  from { transform: scale(0.985); }
+  to   { transform: scale(1.015); }
+}
+
+/* ============================================================
+   Custom Confirm-Dialog
+   ============================================================ */
+.mc-confirm-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+  animation: mc-fade-in 0.18s ease;
+}
+.mc-confirm-leave { animation: mc-fade-out 0.12s ease forwards; }
+@keyframes mc-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mc-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+.mc-confirm {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  width: min(420px, 100%);
+  overflow: hidden;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+  transform: translateY(8px);
+  animation: mc-pop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2) forwards;
+}
+@keyframes mc-pop { to { transform: translateY(0); } }
+
+/* Karierte Flagge oben als Marken-Akzent */
+.mc-confirm-flag {
+  height: 8px;
+  background-image:
+    linear-gradient(45deg, #1f1f1f 25%, transparent 25%, transparent 75%, #1f1f1f 75%),
+    linear-gradient(45deg, #1f1f1f 25%, #ffffff 25%, #ffffff 75%, #1f1f1f 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 6px 6px;
+}
+.mc-confirm-body {
+  padding: 18px 20px 20px;
+}
+.mc-confirm-title {
+  margin: 0 0 6px;
+  font-size: 18px; font-weight: 700; line-height: 1.3;
+  color: var(--text);
+}
+.mc-confirm-text {
+  margin: 0 0 16px;
+  font-size: 14px; color: var(--text-dim);
+  line-height: 1.45;
+}
+.mc-confirm-actions {
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+.mc-btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.mc-btn:hover { background: var(--surface); border-color: var(--accent); }
+.mc-btn--ghost { background: transparent; color: var(--text-dim); }
+.mc-btn--ghost:hover { color: var(--text); background: var(--surface-2); }
+.mc-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+.mc-btn--primary:hover { filter: brightness(1.1); }
+.mc-btn--danger {
+  background: #c81e1e;
+  border-color: #c81e1e;
+  color: #fff;
+}
+.mc-btn--danger:hover { background: #ff4d4d; border-color: #ff4d4d; }
+
+/* ============================================================
+   Konfetti
+   ============================================================ */
+.confetti-piece {
+  position: fixed;
+  left: 0; top: 0;
+  width: 8px; height: 12px;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 1500;
+  transform: translate(var(--cx), var(--cy)) rotate(0deg);
+  animation: confetti-fly 0.85s cubic-bezier(0.15, 0.7, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+@keyframes confetti-fly {
+  0% {
+    transform: translate(var(--cx), var(--cy)) rotate(0deg);
+    opacity: 1;
+  }
+  60% { opacity: 1; }
+  100% {
+    transform: translate(calc(var(--cx) + var(--dx)), calc(var(--cy) + var(--dy) + 80px)) rotate(var(--rot));
+    opacity: 0;
+  }
+}
+
+/* ============================================================
+   Cooldown-Ring (im Slot)
+   ============================================================ */
+.cd-ring {
+  position: relative;
+  width: 70px; height: 70px;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+}
+.cd-ring svg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.cd-ring-track {
+  fill: none;
+  stroke: rgba(255,255,255,0.08);
+  stroke-width: 6;
+}
+.cd-ring-fill {
+  fill: none;
+  stroke: #c81e1e;
+  stroke-width: 6;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(200, 30, 30, 0.45));
+  animation: cd-deplete var(--cd-dur, 30000ms) linear forwards;
+}
+@keyframes cd-deplete {
+  to { stroke-dasharray: 0 var(--cd-circ, 226.19); }
+}
+.cd-ring-text {
+  position: relative; z-index: 1;
+  font-weight: 800; font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* MEINS-Slot leicht atmen lassen */
+.slot:not(.filled):not(.cooldown):not(.locked) .slot-meins {
+  animation: meins-breathe 2.4s ease-in-out infinite;
+}
+.slot:not(.filled):not(.cooldown):not(.locked):active {
+  transform: scale(0.96);
+  transition: transform 80ms ease;
+}
+@keyframes meins-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.04); opacity: 0.85; }
+}
+
+/* ============================================================
+   Trophäen-Schrank
+   ============================================================ */
+.tro-head { margin: 8px 0 16px; }
+.tro-head h2 { margin: 0 0 4px; }
+.tro-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.tro-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.tro-tile::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+  background-image:
+    linear-gradient(45deg, #1f1f1f 25%, transparent 25%, transparent 75%, #1f1f1f 75%),
+    linear-gradient(45deg, #1f1f1f 25%, #ffffff 25%, #ffffff 75%, #1f1f1f 75%);
+  background-size: 6px 6px;
+  background-position: 0 0, 3px 3px;
+  opacity: 0.5;
+}
+.tro-tile-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text-dim);
+}
+.tro-tile-value {
+  font-size: 18px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.tro-tile-sub { font-size: 12px; color: var(--text-dim); }
+
+.tro-section h3 {
+  margin: 0 0 10px;
+  font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--text-dim);
+}
+.tro-achievements {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+.tro-ach {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  transition: border-color 0.15s, background 0.15s;
+}
+.tro-ach--done {
+  border-color: rgba(240, 160, 42, 0.55);
+  background: linear-gradient(180deg, rgba(255,196,64,0.10), transparent 70%);
+}
+.tro-ach--locked { opacity: 0.5; filter: grayscale(0.6); }
+.tro-ach-icon { font-size: 22px; }
+.tro-ach-label { font-size: 13px; font-weight: 600; }
+
+/* ============================================================
+   Verlauf (Timeline)
+   ============================================================ */
+.his-head { margin: 8px 0 16px; }
+.his-head h2 { margin: 0 0 4px; }
+.his-timeline { display: flex; flex-direction: column; }
+.his-day {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 12px;
+  padding-bottom: 14px;
+}
+.his-day-marker {
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 6px;
+}
+.his-day-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--bg);
+}
+.his-day--empty .his-day-dot { background: var(--surface-2); border: 1px solid var(--border); }
+.his-day-line {
+  flex: 1;
+  width: 2px;
+  background: var(--border);
+  margin-top: 6px;
+  min-height: 20px;
+}
+.his-day-body {
+  display: flex; flex-direction: column; gap: 8px;
+  padding-bottom: 4px;
+}
+.his-day-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 8px;
+}
+.his-day-label {
+  font-weight: 700; font-size: 14px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.his-day-summary { font-size: 12px; color: var(--text-dim); }
+.his-day--empty .his-day-summary { font-style: italic; }
+.his-day-items { display: flex; flex-direction: column; gap: 6px; }
+
+.his-item {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.his-item-photo {
+  width: 44px; height: 44px;
+  border-radius: 8px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-2);
+}
+.his-item-photo img { width: 100%; height: 100%; object-fit: cover; }
+.his-item-name { font-weight: 600; font-size: 14px; }
+.his-item-sub { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; }

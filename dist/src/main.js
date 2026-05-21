@@ -16,6 +16,9 @@ import { theme, applyTheme } from './theme.js';
 import { pickAndCompressPhoto } from './photo-capture.js';
 import * as collection from './collection.js';
 import { getPhoto, getPhotos } from './photos.js';
+import { TEXT, CONFIRM } from './messages.js';
+import { customConfirm, spawnConfetti, cooldownRingHTML } from './ui.js';
+import * as stats from './stats.js';
 
 sounds.load();
 applyTheme();
@@ -28,7 +31,7 @@ const app = $('#app');
 let mp = null;
 let game = null;
 let cooldownTickHandle = null;
-let justAddedKey = null; // "playerId:slotIdx" — fuer Eintrag-Animation
+let justAddedKey = null; // "playerId:slotIdx" — für Eintrag-Animation
 let gameStartedAt = 0;
 
 function toast(msg, ms = 1800) {
@@ -153,8 +156,8 @@ function renderHome() {
       discardBtn.className = 'ghost-link';
       discardBtn.style.marginTop = '4px';
       discardBtn.textContent = '✕ Gespeichertes Spiel verwerfen';
-      discardBtn.addEventListener('click', () => {
-        if (confirm('Gespeichertes Spiel löschen?')) {
+      discardBtn.addEventListener('click', async () => {
+        if (await customConfirm(CONFIRM.resumeDelete)) {
           clearPersistedGame();
           renderHome();
         }
@@ -177,6 +180,8 @@ function renderHome() {
 
   const collBtn = $('#btn-collection');
   collBtn?.addEventListener('click', renderCollection);
+  $('#btn-trophies')?.addEventListener('click', renderTrophies);
+  $('#btn-history')?.addEventListener('click', renderHistory);
 
   // Gespeicherte Gruppen
   const groups = store.getGroups();
@@ -200,8 +205,8 @@ function renderHome() {
         store.touchGroup(g.id);
         startSingleGame(g.players.map(p => ({ name: p.name, avatar: p.avatar || null })));
       });
-      card.querySelector('.group-card-del').addEventListener('click', () => {
-        if (confirm(`Gruppe „${g.name}" löschen?`)) {
+      card.querySelector('.group-card-del').addEventListener('click', async () => {
+        if (await customConfirm(CONFIRM.groupDelete(g.name))) {
           store.deleteGroup(g.id);
           renderHome();
         }
@@ -266,9 +271,9 @@ function renderSetup() {
     const v = nameInput.value.trim();
     if (!v) return;
     if (players.some(p => p.name.toLowerCase() === v.toLowerCase())) {
-      toast('Name bereits vergeben'); return;
+      toast(TEXT.nameTaken()); return;
     }
-    if (players.length >= 8) { toast('Maximal 8 Spieler'); return; }
+    if (players.length >= 8) { toast(TEXT.maxPlayers()); return; }
     players.push({ name: v.slice(0, 20), avatar: nextAvatar(players.map(p => p.avatar)) });
     nameInput.value = '';
     nameInput.focus();
@@ -281,7 +286,7 @@ function renderSetup() {
     const name = prompt('Name der Gruppe?', players.map(p => p.name).join(' & ').slice(0, 30));
     if (!name) return;
     const g = store.saveGroup(name, players);
-    if (g) { toast(`Gruppe „${g.name}" gespeichert`); haptic.success(); }
+    if (g) { toast(TEXT.groupSaved(g.name)); haptic.success(); }
   });
 
   // Multi-device setup
@@ -291,13 +296,13 @@ function renderSetup() {
 
   $('#multi-create').addEventListener('click', async () => {
     const n = myName.value.trim();
-    if (!n) { myName.focus(); toast('Bitte deinen Namen eingeben'); return; }
+    if (!n) { myName.focus(); toast(TEXT.needName()); return; }
     store.setSettings({ name: n });
     await flowCreateRoom(n);
   });
   $('#multi-join').addEventListener('click', () => {
     const n = myName.value.trim();
-    if (!n) { myName.focus(); toast('Bitte deinen Namen eingeben'); return; }
+    if (!n) { myName.focus(); toast(TEXT.needName()); return; }
     store.setSettings({ name: n });
     flowJoinRoom(n);
   });
@@ -320,7 +325,7 @@ function cycleAvatar(players, i) {
 function startSingleGame(playersInput, opts = null) {
   // playersInput kann Array<string> oder Array<{name,avatar}> sein.
   const arr = (playersInput || []).map(p => typeof p === 'string' ? { name: p, avatar: null } : p);
-  if (arr.length < 2) { toast('Mindestens 2 Spieler'); return; }
+  if (arr.length < 2) { toast(TEXT.minPlayers()); return; }
   // Avatare auffüllen
   arr.forEach((p, i) => {
     if (!p.avatar) p.avatar = nextAvatar(arr.slice(0, i).map(q => q.avatar));
@@ -341,7 +346,7 @@ function renderGame() {
   app.innerHTML = '';
   app.appendChild(tpl('tpl-game'));
   $('#game-leave').addEventListener('click', () => {
-    if (confirm('Spiel beenden?')) renderHome();
+    (async () => { if (await customConfirm(CONFIRM.endGame)) renderHome(); })();
   });
   refreshGameView();
 }
@@ -419,12 +424,29 @@ function startCooldownTickIfNeeded() {
   cooldownTickHandle = setInterval(() => {
     if (!game) { clearInterval(cooldownTickHandle); cooldownTickHandle = null; return; }
     const stillCooling = game.players.some(p => isInCooldown(p));
+    // Surgisch: nur den Sekunden-Text in den vorhandenen Cooldown-Ringen updaten,
+    // damit CSS-Animationen (Ring + MEINS-Atmen) nicht jedes Mal resetten.
     if (app.querySelector('.view-game')) {
-      const grid = $('#players-grid');
-      if (grid) {
-        grid.innerHTML = '';
-        game.players.forEach(p => grid.appendChild(buildPlayerCard(p)));
-      }
+      game.players.forEach(p => {
+        const remMs = cooldownRemainingMs(p);
+        const sec = Math.ceil(remMs / 1000);
+        document.querySelectorAll(`.slot.cooldown[data-key^="${p.id}:"] .cd-ring-text`)
+          .forEach(el => { el.textContent = `${sec}s`; });
+        // wenn Cooldown abgelaufen, Spieler-Karte komplett neu rendern
+        if (remMs <= 0) {
+          const grid = $('#players-grid');
+          if (grid) {
+            const cards = grid.querySelectorAll('.player-card');
+            cards.forEach(c => {
+              const slots = c.querySelectorAll('.slot.cooldown');
+              if (slots.length && slots[0].dataset.key.startsWith(p.id + ':')) {
+                const newCard = buildPlayerCard(p);
+                c.replaceWith(newCard);
+              }
+            });
+          }
+        }
+      });
     }
     if (!stillCooling) { clearInterval(cooldownTickHandle); cooldownTickHandle = null; }
   }, 250);
@@ -482,20 +504,16 @@ function buildSlot(player, idx, car) {
       del.title = 'Auto löschen (Cooldown!)';
       del.setAttribute('aria-label', 'Auto löschen');
       del.textContent = '✕';
-      del.addEventListener('click', (e) => {
+      del.addEventListener('click', async (e) => {
         e.stopPropagation();
         const cdSec = game ? nextCooldownSec(game, player) : 0;
         const baseSec = game?.cooldownSec || 0;
-        let msg;
-        if (baseSec <= 0) {
-          msg = `${player.name}: "${car.brand} ${car.model}" löschen?`;
-        } else if (cdSec > baseSec) {
-          const factor = Math.round(cdSec / baseSec);
-          msg = `${player.name}: "${car.brand} ${car.model}" löschen?\nMehrfach-Strafe: ${cdSec}s Cooldown (×${factor}).`;
-        } else {
-          msg = `${player.name}: "${car.brand} ${car.model}" löschen?\nDanach ${cdSec}s Cooldown.`;
-        }
-        if (confirm(msg)) handleClearSlot(player.id, idx);
+        const factor = baseSec > 0 ? Math.max(1, Math.round(cdSec / baseSec)) : 1;
+        const ok = await customConfirm(CONFIRM.slotDelete({
+          playerName: player.name, brand: car.brand, model: car.model,
+          cooldownSec: cdSec, factor,
+        }));
+        if (ok) handleClearSlot(player.id, idx);
       });
       el.appendChild(del);
     }
@@ -509,9 +527,10 @@ function buildSlot(player, idx, car) {
     return el;
   }
   if (cooling) {
-    const sec = Math.ceil(cooldownRemainingMs(player) / 1000);
+    const remainingMs = cooldownRemainingMs(player);
+    const totalMs = (game?.cooldownSec || 0) * 1000 * (player.deleteStreak || 1);
     el.classList.add('cooldown');
-    el.innerHTML = `<div class="slot-meins">⏱ ${sec}s</div><div class="slot-plus">Cooldown</div>`;
+    el.innerHTML = cooldownRingHTML(remainingMs, totalMs) + '<div class="slot-plus">Cooldown</div>';
     el.disabled = true;
     return el;
   }
@@ -543,7 +562,7 @@ function handleAddCar(playerId, slotIdx, car) {
   const res = setSlot(game, playerId, slotIdx, car);
   if (!res.ok && res.reason === 'cooldown') {
     sounds.blocked(); haptic.error();
-    toast('Noch im Cooldown — warte kurz.'); return;
+    toast(TEXT.cooldown()); return;
   }
   if (mp?.isHost) mp.host.broadcast({ type: 'state', state: gameToWire(game) });
   justAddedKey = `${playerId}:${slotIdx}`;
@@ -552,6 +571,12 @@ function handleAddCar(playerId, slotIdx, car) {
   haptic.medium();
   persistGame();
   refreshGameView();
+  // Konfetti & Toast aus dem gerade gefuellten Slot
+  requestAnimationFrame(() => {
+    const slotEl = document.querySelector(`.slot[data-key="${playerId}:${slotIdx}"]`);
+    if (slotEl) spawnConfetti(slotEl);
+  });
+  toast(TEXT.caught(), 1200);
 
   // Optionales Beweis-Foto -> Sammlung (nur Single-Device)
   if (game.mode === 'single') {
@@ -564,17 +589,17 @@ async function askPhotoAndCollect(car, playerName) {
   const want = await openPhotoPrompt();
   if (!want) return;
   const dataUrl = await pickAndCompressPhoto();
-  if (!dataUrl) { toast('Kein Foto aufgenommen'); return; }
+  if (!dataUrl) { toast(TEXT.photoMissing()); return; }
   try {
     await collection.addEntry({
       brand: car.brand, model: car.model, price: car.price,
       dataUrl, playerName: playerName || null,
     });
-    toast('Zur Sammlung hinzugefuegt');
+    toast(TEXT.collectionAdded());
     haptic.success();
   } catch (e) {
     console.warn('[collection]', e);
-    toast('Konnte nicht gespeichert werden');
+    toast(TEXT.saveError());
   }
 }
 
@@ -614,6 +639,7 @@ function handleClearSlot(playerId, slotIdx) {
   haptic.light();
   persistGame();
   refreshGameView();
+  toast(TEXT.removed(), 1200);
 }
 
 // ============================================================
@@ -677,7 +703,7 @@ function renderSummary(state) {
       mp.host.broadcast({ type: 'state', state: gameToWire(game) });
       renderGame();
     } else if (mp && !mp.isHost) {
-      toast('Nur der Rundenmeister kann ein neues Spiel starten.');
+      toast(TEXT.hostOnly());
     } else {
       startSingleGame(state.players.map(p => p.name));
     }
@@ -777,7 +803,7 @@ async function renderCollection() {
     scope.querySelectorAll('.coll-del').forEach(b => {
       b.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (!confirm('Diesen Eintrag aus der Sammlung entfernen?')) return;
+        if (!(await customConfirm(CONFIRM.collectionDelete))) return;
         await collection.removeEntry(b.dataset.id);
         renderCollection();
       });
@@ -898,6 +924,126 @@ async function renderCollection() {
 }
 
 // ============================================================
+// TROPHIES & STATISTIK
+// ============================================================
+async function renderTrophies() {
+  cleanupSession();
+  app.innerHTML = '';
+  app.appendChild(tpl('tpl-trophies'));
+  $('#tro-back').addEventListener('click', renderHome);
+
+  const s = stats.computeStats();
+  const statsHost = $('#tro-stats');
+  const tiles = [];
+  tiles.push({ label: 'Autos gesammelt', value: String(s.totalCount) });
+  tiles.push({ label: 'Marken-Schubladen', value: String(s.brandCount) });
+  tiles.push({ label: 'Sammlungswert', value: fmtEUR(s.totalValue) });
+  if (s.topItem) {
+    tiles.push({
+      label: 'Teuerstes Stück',
+      value: `${s.topItem.brand} ${s.topItem.model}`,
+      sub: fmtEUR(s.topItem.price),
+    });
+  }
+  if (s.favBrand) {
+    tiles.push({
+      label: 'Lieblings-Marke',
+      value: s.favBrand.brand,
+      sub: `${s.favBrand.count} ${s.favBrand.count === 1 ? 'Auto' : 'Autos'} · ${fmtEUR(s.favBrand.value)}`,
+    });
+  }
+  if (s.richestDay) {
+    const d = new Date(s.richestDay.date).toLocaleDateString('de-DE');
+    tiles.push({
+      label: 'Bester Tag',
+      value: fmtEUR(s.richestDay.value),
+      sub: `${d} · ${s.richestDay.count} ${s.richestDay.count === 1 ? 'Auto' : 'Autos'}`,
+    });
+  }
+  tiles.push({ label: 'Streak', value: `${s.streak} ${s.streak === 1 ? 'Tag' : 'Tage'}`, sub: s.streak >= 1 ? 'Weiter so.' : 'Heute startest du.' });
+
+  statsHost.innerHTML = tiles.map(t => `
+    <div class="tro-tile">
+      <div class="tro-tile-label">${escapeHtml(t.label)}</div>
+      <div class="tro-tile-value">${escapeHtml(t.value)}</div>
+      ${t.sub ? `<div class="tro-tile-sub">${escapeHtml(t.sub)}</div>` : ''}
+    </div>
+  `).join('');
+
+  const aHost = $('#tro-achievements');
+  aHost.innerHTML = s.achievements.map(a => `
+    <div class="tro-ach ${a.done ? 'tro-ach--done' : 'tro-ach--locked'}">
+      <span class="tro-ach-icon">${a.done ? a.icon : '🔒'}</span>
+      <span class="tro-ach-label">${escapeHtml(a.label)}</span>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// VERLAUF (letzte 7 Tage)
+// ============================================================
+async function renderHistory() {
+  cleanupSession();
+  app.innerHTML = '';
+  app.appendChild(tpl('tpl-history'));
+  $('#his-back').addEventListener('click', renderHome);
+
+  const days = stats.recentDays(7);
+  const allItems = days.flatMap(d => d.items);
+  let photoMap = {};
+  if (allItems.length) {
+    try { photoMap = await getPhotos(allItems.map(it => it.photoId)); } catch {}
+  }
+
+  const host = $('#his-timeline');
+  const today = new Date().toISOString().slice(0, 10);
+  const yest  = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })();
+
+  host.innerHTML = '';
+  days.forEach((day, i) => {
+    const sec = document.createElement('div');
+    sec.className = 'his-day' + (day.count === 0 ? ' his-day--empty' : '');
+    const label = day.date === today ? 'Heute' : day.date === yest ? 'Gestern'
+      : new Date(day.date).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    const summary = day.count > 0
+      ? `${day.count} ${day.count === 1 ? 'Auto' : 'Autos'} · ${fmtEUR(day.value)}`
+      : 'Nichts gefangen';
+    sec.innerHTML = `
+      <div class="his-day-marker" aria-hidden="true">
+        <div class="his-day-dot"></div>
+        ${i < days.length - 1 ? '<div class="his-day-line"></div>' : ''}
+      </div>
+      <div class="his-day-body">
+        <div class="his-day-head">
+          <div class="his-day-label">${escapeHtml(label)}</div>
+          <div class="his-day-summary">${escapeHtml(summary)}</div>
+        </div>
+        <div class="his-day-items"></div>
+      </div>
+    `;
+    const itemsHost = sec.querySelector('.his-day-items');
+    day.items
+      .slice()
+      .sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
+      .forEach(it => {
+        const photo = photoMap[it.photoId];
+        const card = document.createElement('div');
+        card.className = 'his-item';
+        const time = new Date(it.addedAt || 0).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        card.innerHTML = `
+          <div class="his-item-photo">${photo ? `<img src="${photo}" alt="" loading="lazy" />` : brandBadgeHTML(it.brand, 'md')}</div>
+          <div class="his-item-meta">
+            <div class="his-item-name">${escapeHtml(it.brand)} ${escapeHtml(it.model)}</div>
+            <div class="his-item-sub">${time} · ${fmtEUR(it.price)}${it.playerName ? ` · ${escapeHtml(it.playerName)}` : ''}</div>
+          </div>
+        `;
+        itemsHost.appendChild(card);
+      });
+    host.appendChild(sec);
+  });
+}
+
+// ============================================================
 // MULTIPLAYER
 // ============================================================
 async function flowCreateRoom(name) {
@@ -948,7 +1094,7 @@ function flowJoinRoom(name) {
   });
   const go = async () => {
     const code = input.value.trim().toUpperCase();
-    if (code.length < 4) { toast('Code unvollständig'); return; }
+    if (code.length < 4) { toast(TEXT.codeIncomplete()); return; }
     const goBtn = $('#room-go');
     goBtn.disabled = true;
     goBtn.textContent = 'Verbinde…';
@@ -957,7 +1103,7 @@ function flowJoinRoom(name) {
       const peer = await joinHost(code, {
         name,
         onMessage: (msg) => mpHandlePeerMsg(msg),
-        onClose: () => { toast('Verbindung beendet'); renderHome(); },
+        onClose: () => { toast(TEXT.connectionEnded()); renderHome(); },
         onError: (err) => console.warn('peer error', err),
         onProgress: (text) => setStatus(text),
       });
@@ -1011,7 +1157,7 @@ function mpRefreshLobby() {
 }
 
 function mpStartGame() {
-  if (mp.players.length < 2) { toast('Mindestens 2 Spieler'); return; }
+  if (mp.players.length < 2) { toast(TEXT.minPlayers()); return; }
   const s = store.getSettings();
   game = newGameFromPlayers('multi', mp.players, mp.host.peer.id, {
     slotCount: s.slotCount, cooldownSec: s.cooldownSec,
@@ -1072,7 +1218,7 @@ function mpHandlePeerMsg(msg) {
     else refreshGameView();
   }
   if (msg.type === 'denied') {
-    if (msg.reason === 'cooldown') toast('Noch im Cooldown — warte kurz.');
+    if (msg.reason === 'cooldown') toast(TEXT.cooldown());
   }
 }
 
@@ -1117,7 +1263,7 @@ function copyShare(code) {
   if (navigator.share) {
     navigator.share({ title: 'MEINS!', text }).catch(() => {});
   } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => toast('Code kopiert')).catch(() => toast(`Code: ${code}`));
+    navigator.clipboard.writeText(text).then(() => toast(TEXT.codeCopied())).catch(() => toast(`Code: ${code}`));
   } else {
     toast(`Code: ${code}`);
   }
@@ -1136,7 +1282,7 @@ function cleanupSession() {
 // Brand → home
 $('#brand-home').addEventListener('click', () => {
   if (game && game.status === 'playing') {
-    if (!confirm('Spiel verlassen?')) return;
+    if (!(await customConfirm(CONFIRM.leaveMulti))) return;
   }
   renderHome();
 });
@@ -1189,7 +1335,7 @@ if (roomParam) {
   });
   $('#multi-join').addEventListener('click', () => {
     const n = myName.value.trim();
-    if (!n) { myName.focus(); toast('Bitte deinen Namen eingeben'); return; }
+    if (!n) { myName.focus(); toast(TEXT.needName()); return; }
     store.setSettings({ name: n });
     flowJoinRoom(n);
   });
@@ -1197,3 +1343,12 @@ if (roomParam) {
 } else {
   renderHome();
 }
+
+// Splash ausblenden
+requestAnimationFrame(() => {
+  const splash = document.getElementById('app-splash');
+  if (splash) {
+    splash.classList.add('app-splash--hide');
+    setTimeout(() => splash.remove(), 600);
+  }
+});

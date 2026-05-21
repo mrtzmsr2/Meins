@@ -32,6 +32,12 @@
   <main id="app"></main>
   <div id="aria-live" class="sr-only" role="status" aria-live="polite"></div>
 
+  <!-- App-Splash (faded out beim ersten Render) -->
+  <div id="app-splash" aria-hidden="true">
+    <img src="./assets/logo.svg" alt="" />
+    <div class="app-splash-tagline">Wer sammelt die teuersten Autos?</div>
+  </div>
+
   <!-- ============== HOME ============== -->
   <template id="tpl-home">
     <section class="view view-home">
@@ -42,6 +48,8 @@
         <button class="primary big" id="btn-new-game">🏁 Neues Spiel</button>
         <button class="secondary" id="btn-rematch" hidden>↻ Letzte Gruppe wieder spielen</button>
         <button class="secondary" id="btn-collection" type="button">📚 Meine Sammlung</button>
+        <button class="secondary" id="btn-trophies" type="button">🏆 Trophäen &amp; Statistik</button>
+        <button class="secondary" id="btn-history" type="button">🗓️ Verlauf</button>
       </div>
 
       <div class="home-groups" id="home-groups" hidden>
@@ -190,9 +198,37 @@
       </div>
       <div class="coll-body" id="coll-body"></div>
       <div class="coll-empty" id="coll-empty" hidden>
-        <p>Noch keine Eintraege.</p>
+        <p>Noch keine Einträge.</p>
         <p class="hint">In der Sammlung landen nur Autos mit <strong>Beweis-Foto</strong>. Beim Eintragen im Spiel kannst du eines aufnehmen.</p>
       </div>
+    </section>
+  </template>
+
+  <!-- ============== TROPHIES ============== -->
+  <template id="tpl-trophies">
+    <section class="view view-trophies">
+      <button class="ghost-link" id="tro-back">← Zurück</button>
+      <div class="tro-head">
+        <h2>Trophäen-Schrank</h2>
+        <p class="hint">Alles, was du bisher gesammelt hast — auf einen Blick.</p>
+      </div>
+      <div class="tro-stats" id="tro-stats"></div>
+      <div class="tro-section">
+        <h3>Erfolge</h3>
+        <div class="tro-achievements" id="tro-achievements"></div>
+      </div>
+    </section>
+  </template>
+
+  <!-- ============== HISTORY ============== -->
+  <template id="tpl-history">
+    <section class="view view-history">
+      <button class="ghost-link" id="his-back">← Zurück</button>
+      <div class="his-head">
+        <h2>Verlauf</h2>
+        <p class="hint">Die letzten 7 Tage deiner Sammlung.</p>
+      </div>
+      <div class="his-timeline" id="his-timeline"></div>
     </section>
   </template>
 
@@ -202,10 +238,10 @@
       <div class="photo-prompt-card">
         <div class="photo-prompt-icon">📷</div>
         <div class="photo-prompt-title">Beweis-Foto?</div>
-        <div class="photo-prompt-sub">Mit Foto landet das Auto in deiner Sammlung. Ohne Foto wird es nur fuer dieses Spiel gezaehlt.</div>
+        <div class="photo-prompt-sub">Mit Foto landet das Auto in deiner Sammlung. Ohne Foto wird es nur für dieses Spiel gezählt.</div>
         <div class="photo-prompt-actions">
           <button type="button" class="primary" data-act="take">📷 Foto aufnehmen</button>
-          <button type="button" class="secondary" data-act="skip">Ueberspringen</button>
+          <button type="button" class="secondary" data-act="skip">Überspringen</button>
         </div>
       </div>
     </div>
