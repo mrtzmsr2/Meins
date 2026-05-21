@@ -11,27 +11,13 @@
   </defs>
   <!-- Vollflaechiger Hintergrund (maskable safe zone ist 80% Mitte) -->
   <rect width="512" height="512" fill="url(#meins-bg-m)"/>
-  <g transform="translate(256 256) scale(0.7) translate(-256 -256)">
-    <text x="256" y="298" text-anchor="middle"
-          font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
-          font-weight="900" font-size="148" font-style="italic" letter-spacing="-3">
+  <g transform="translate(256 256) scale(0.72) translate(-256 -256)">
+    <text x="256" y="290" text-anchor="middle"
+          textLength="380" lengthAdjust="spacingAndGlyphs"
+          font-family="'Arial Black', 'Helvetica Neue', Helvetica, Arial, sans-serif"
+          font-weight="900" font-size="138" letter-spacing="-1">
       <tspan fill="#ffffff">MEINS</tspan><tspan fill="url(#meins-accent-m)">!</tspan>
     </text>
-    <g transform="translate(120 360)">
-      <rect width="272" height="22" rx="4" fill="#ffffff"/>
-      <g fill="#0a0a0a">
-        <rect x="0"   y="0"  width="24" height="11"/>
-        <rect x="48"  y="0"  width="24" height="11"/>
-        <rect x="96"  y="0"  width="24" height="11"/>
-        <rect x="144" y="0"  width="24" height="11"/>
-        <rect x="192" y="0"  width="24" height="11"/>
-        <rect x="240" y="0"  width="24" height="11"/>
-        <rect x="24"  y="11" width="24" height="11"/>
-        <rect x="72"  y="11" width="24" height="11"/>
-        <rect x="120" y="11" width="24" height="11"/>
-        <rect x="168" y="11" width="24" height="11"/>
-        <rect x="216" y="11" width="24" height="11"/>
-      </g>
-    </g>
+    <rect x="106" y="326" width="300" height="12" rx="6" fill="url(#meins-accent-m)"/>
   </g>
 </svg>
