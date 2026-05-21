@@ -228,6 +228,30 @@ main {
 }
 .mp-status.error { color: var(--bad); }
 
+/* In-Game Code-Banner fuer Host */
+.mp-code-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 8px 12px;
+  position: relative; overflow: hidden;
+}
+.mp-code-banner::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  background:
+    linear-gradient(45deg, #1f1f1f 25%, transparent 25%, transparent 75%, #1f1f1f 75%) 0 0 / 8px 8px,
+    linear-gradient(45deg, #1f1f1f 25%, #ffffff 25%, #ffffff 75%, #1f1f1f 75%) 4px 4px / 8px 8px;
+}
+.mp-code-banner-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--text-dim); padding-left: 8px;
+}
+.mp-code-banner-code {
+  font-family: ui-monospace, monospace; font-weight: 800;
+  font-size: 22px; letter-spacing: 4px; color: var(--text);
+  flex: 1;
+}
+.mp-code-banner-share { flex: 0 0 auto; }
+
 /* ====================== GAME ====================== */
 .view-game { display: flex; flex-direction: column; gap: 14px; }
 .game-head {

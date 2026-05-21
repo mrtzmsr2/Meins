@@ -348,6 +348,19 @@ function renderGame() {
   $('#game-leave').addEventListener('click', () => {
     (async () => { if (await customConfirm(CONFIRM.endGame)) renderHome(); })();
   });
+  // Im Multiplayer-Hostmodus: Code-Banner einblenden, damit Mitspieler jederzeit beitreten koennen
+  if (game?.mode === 'multi' && mp?.isHost && mp.host?.roomCode) {
+    const view = app.querySelector('.view-game');
+    const banner = document.createElement('div');
+    banner.className = 'mp-code-banner';
+    banner.innerHTML = `
+      <div class="mp-code-banner-label">Beitritts-Code</div>
+      <div class="mp-code-banner-code">${escapeHtml(mp.host.roomCode)}</div>
+      <button class="icon-btn mp-code-banner-share" id="mp-code-share" title="Code teilen" aria-label="Code teilen">📋</button>
+    `;
+    view.insertBefore(banner, view.firstChild.nextSibling);
+    banner.querySelector('#mp-code-share').addEventListener('click', () => copyShare(mp.host.roomCode));
+  }
   refreshGameView();
 }
 
@@ -1057,10 +1070,17 @@ async function flowCreateRoom(name) {
   let host;
   try {
     host = await createHost(code, {
-      onPeerJoin: () => mpRefreshLobby(),
+      onPeerJoin: (peerId) => {
+        if (game) {
+          // Spiel laeuft — wird nach 'name'-Nachricht aufgenommen
+        } else {
+          mpRefreshLobby();
+        }
+      },
       onPeerLeave: (peerId) => {
         if (game) game.players = game.players.filter(p => p.id !== peerId);
-        mpRefreshLobby();
+        if (!game) mpRefreshLobby();
+        else { mp.host.broadcast({ type: 'state', state: gameToWire(game) }); refreshGameView(); }
       },
       onMessage: (peerId, msg) => mpHandleHostMsg(peerId, msg),
       onError: (err) => console.warn('host error', err),
@@ -1131,7 +1151,7 @@ function mpRenderRoom() {
   $('#room-start').addEventListener('click', () => mpStartGame());
   renderSettingsBlock($('#room-settings'));
   mpRefreshLobby();
-  setStatus(`Warte auf Mitspieler. Teile den Code: ${mp.host.roomCode}`);
+  setStatus(`Code: ${mp.host.roomCode} — starte wann du willst, andere können während des Spiels beitreten.`);
 }
 
 function mpRefreshLobby() {
@@ -1152,12 +1172,32 @@ function mpRefreshLobby() {
     `;
     list.appendChild(row);
   });
-  $('#room-start').disabled = mp.players.length < 2;
+  $('#room-start').disabled = false;
   mp.host.broadcast({ type: 'lobby', players: mp.players });
 }
 
+/** Bei laufendem Spiel: neue Peers nachtraeglich als Spieler aufnehmen. */
+function mpAddPlayerLive(peerId, name) {
+  if (!game || !mp?.isHost) return;
+  if (game.players.find(p => p.id === peerId)) return;
+  game.players.push({
+    id: peerId, name: String(name || 'Spieler').slice(0, 20),
+    avatar: null, isHost: false,
+    slots: Array(game.slotCount).fill(null),
+    cooldownUntil: 0, deleteStreak: 0, streakDecayAt: 0,
+  });
+  // Falls vorher "done" weil alle Slots voll waren — wieder aktiv
+  if (allSlotsFilledFn()) game.status = 'done'; else game.status = 'playing';
+  mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+  refreshGameView();
+  toast(`${name} ist beigetreten.`, 1400);
+}
+function allSlotsFilledFn() {
+  if (!game) return false;
+  return game.players.every(pl => pl.slots.every(s => s != null));
+}
+
 function mpStartGame() {
-  if (mp.players.length < 2) { toast(TEXT.minPlayers()); return; }
   const s = store.getSettings();
   game = newGameFromPlayers('multi', mp.players, mp.host.peer.id, {
     slotCount: s.slotCount, cooldownSec: s.cooldownSec,
@@ -1190,7 +1230,12 @@ function mpHandleHostMsg(peerId, msg) {
     refreshGameView();
   }
   if (msg.type === 'name') {
-    mpRefreshLobby();
+    if (game) {
+      // Live-Beitritt waehrend des Spiels
+      mpAddPlayerLive(peerId, msg.name);
+    } else {
+      mpRefreshLobby();
+    }
   }
 }
 
