@@ -487,7 +487,9 @@ main {
 /* Small screens */
 @media (max-width: 540px) {
   main { padding: 18px 14px 60px; }
-  .topbar { padding: 12px 14px; }
+  .topbar {
+    padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left));
+  }
   .game-head { top: 56px; }
   .multi-actions { grid-template-columns: 1fr; }
 }
