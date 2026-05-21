@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MEINS!">
+  <defs>
+    <linearGradient id="meins-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1c1c1c"/>
+      <stop offset="100%" stop-color="#0a0a0a"/>
+    </linearGradient>
+    <linearGradient id="meins-accent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe27a"/>
+      <stop offset="100%" stop-color="#ffd84d"/>
+    </linearGradient>
+    <filter id="meins-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- App-Tile -->
+  <rect width="512" height="512" rx="104" ry="104" fill="url(#meins-bg)"/>
+
+  <!-- Speedlines -->
+  <g opacity="0.16" stroke="#ffd84d" stroke-width="8" stroke-linecap="round">
+    <line x1="56"  y1="116" x2="180" y2="116"/>
+    <line x1="36"  y1="156" x2="140" y2="156"/>
+    <line x1="56"  y1="396" x2="180" y2="396"/>
+    <line x1="36"  y1="436" x2="160" y2="436"/>
+  </g>
+
+  <!-- Wordmark -->
+  <g filter="url(#meins-shadow)">
+    <text x="256" y="298" text-anchor="middle"
+          font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+          font-weight="900" font-size="148" font-style="italic" letter-spacing="-3">
+      <tspan fill="#ffffff">MEINS</tspan><tspan fill="url(#meins-accent)">!</tspan>
+    </text>
+  </g>
+
+  <!-- Zielflagge -->
+  <g transform="translate(120 360)">
+    <rect width="272" height="22" rx="4" fill="#ffffff"/>
+    <g fill="#0a0a0a">
+      <rect x="0"   y="0"  width="24" height="11"/>
+      <rect x="48"  y="0"  width="24" height="11"/>
+      <rect x="96"  y="0"  width="24" height="11"/>
+      <rect x="144" y="0"  width="24" height="11"/>
+      <rect x="192" y="0"  width="24" height="11"/>
+      <rect x="240" y="0"  width="24" height="11"/>
+      <rect x="24"  y="11" width="24" height="11"/>
+      <rect x="72"  y="11" width="24" height="11"/>
+      <rect x="120" y="11" width="24" height="11"/>
+      <rect x="168" y="11" width="24" height="11"/>
+      <rect x="216" y="11" width="24" height="11"/>
+    </g>
+  </g>
+</svg>
