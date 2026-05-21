@@ -82,7 +82,14 @@ export function setSlot(state, playerId, slotIndex, car) {
   return { ok: true };
 }
 
-/** Remove a car. Triggers a cooldown for that player (uses state.cooldownSec). */
+/**
+ * Remove a car. Triggers a STACKING cooldown:
+ * - 1. Loeschung: cooldownSec
+ * - 2. Loeschung in Folge: cooldownSec * 2 (oben drauf, falls noch im Cooldown)
+ * - 3. Loeschung in Folge: cooldownSec * 3, usw.
+ * Streak laeuft aus, wenn nach Cooldown-Ende eine Karenzzeit (2x cooldownSec)
+ * ohne weitere Loeschung vergeht.
+ */
 export function clearSlot(state, playerId, slotIndex) {
   const p = state.players.find(p => p.id === playerId);
   if (!p) return { ok: false };
@@ -91,9 +98,27 @@ export function clearSlot(state, playerId, slotIndex) {
   p.slots[slotIndex] = null;
   state.status = 'playing';
   if ((state.cooldownSec || 0) > 0) {
-    p.cooldownUntil = Date.now() + state.cooldownSec * 1000;
+    const now = Date.now();
+    const cdMs = state.cooldownSec * 1000;
+    const decayAt = p.streakDecayAt || 0;
+    const streak = (now > decayAt) ? 1 : ((p.deleteStreak || 0) + 1);
+    const addMs = cdMs * streak;
+    const base = Math.max(now, p.cooldownUntil || 0);
+    p.cooldownUntil = base + addMs;
+    p.deleteStreak = streak;
+    p.streakDecayAt = p.cooldownUntil + cdMs * 2;
   }
   return { ok: true };
+}
+
+/** Naechste Cooldown-Dauer in Sek., wenn der Spieler JETZT loeschen wuerde. */
+export function nextCooldownSec(state, player) {
+  const cdSec = state.cooldownSec || 0;
+  if (cdSec <= 0) return 0;
+  const now = Date.now();
+  const decayAt = player.streakDecayAt || 0;
+  const streak = (now > decayAt) ? 1 : ((player.deleteStreak || 0) + 1);
+  return cdSec * streak;
 }
 
 export function allSlotsFilled(state) {

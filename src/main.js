@@ -4,7 +4,7 @@ import { store } from './store.js';
 import { createHost, joinHost, makeRoomCode } from './multiplayer.js';
 import {
   newGame, newGameFromPlayers, setSlot, clearSlot, ranking, progress, totalForPlayer,
-  isInCooldown, cooldownRemainingMs,
+  isInCooldown, cooldownRemainingMs, nextCooldownSec,
   clampSlotCount, clampCooldownSec,
   MIN_SLOT_COUNT, MAX_SLOT_COUNT, MIN_COOLDOWN_SEC, MAX_COOLDOWN_SEC,
 } from './game.js';
@@ -439,8 +439,11 @@ function buildPlayerCard(player) {
 
   const total = totalForPlayer(player);
   const cooldownMs = cooldownRemainingMs(player);
+  const streak = player.deleteStreak || 0;
+  const streakHtml = (cooldownMs > 0 && streak > 1)
+    ? `<span class="cooldown-streak" title="Mehrfach-Löschen-Strafe">×${streak}</span>` : '';
   const cooldownBadge = cooldownMs > 0
-    ? `<span class="cooldown-badge" title="Cooldown nach Löschen">⏱ ${Math.ceil(cooldownMs / 1000)}s</span>`
+    ? `<span class="cooldown-badge" title="Cooldown nach Löschen">⏱ ${Math.ceil(cooldownMs / 1000)}s${streakHtml}</span>`
     : '';
 
   card.innerHTML = `
@@ -481,10 +484,17 @@ function buildSlot(player, idx, car) {
       del.textContent = '✕';
       del.addEventListener('click', (e) => {
         e.stopPropagation();
-        const cdSec = game?.cooldownSec || 0;
-        const msg = cdSec > 0
-          ? `${player.name}: "${car.brand} ${car.model}" löschen?\nDanach ${cdSec}s Cooldown.`
-          : `${player.name}: "${car.brand} ${car.model}" löschen?`;
+        const cdSec = game ? nextCooldownSec(game, player) : 0;
+        const baseSec = game?.cooldownSec || 0;
+        let msg;
+        if (baseSec <= 0) {
+          msg = `${player.name}: "${car.brand} ${car.model}" löschen?`;
+        } else if (cdSec > baseSec) {
+          const factor = Math.round(cdSec / baseSec);
+          msg = `${player.name}: "${car.brand} ${car.model}" löschen?\nMehrfach-Strafe: ${cdSec}s Cooldown (×${factor}).`;
+        } else {
+          msg = `${player.name}: "${car.brand} ${car.model}" löschen?\nDanach ${cdSec}s Cooldown.`;
+        }
         if (confirm(msg)) handleClearSlot(player.id, idx);
       });
       el.appendChild(del);
@@ -684,76 +694,168 @@ async function renderCollection() {
   app.appendChild(tpl('tpl-collection'));
   $('#coll-back').addEventListener('click', renderHome);
 
-  const items = collection.getAll();
   const settings = collection.getSettings();
+  let activeTab = settings.tab === 'all' ? 'all' : 'brands';
   const showCb = $('#coll-show-photos');
   showCb.checked = !!settings.showPhotos;
-  showCb.addEventListener('change', () => {
-    collection.setSettings({ showPhotos: showCb.checked });
-    drawList();
+
+  const tabs = $$('.coll-tab');
+  tabs.forEach(t => {
+    t.addEventListener('click', () => {
+      activeTab = t.dataset.tab;
+      tabs.forEach(x => {
+        const on = x.dataset.tab === activeTab;
+        x.classList.toggle('active', on);
+        x.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      collection.setSettings({ tab: activeTab });
+      draw();
+    });
+    if (t.dataset.tab === activeTab) {
+      t.classList.add('active');
+      t.setAttribute('aria-selected', 'true');
+    } else {
+      t.classList.remove('active');
+      t.setAttribute('aria-selected', 'false');
+    }
   });
 
-  const stats = collection.stats();
-  $('#coll-stats').innerHTML = items.length === 0 ? '' : `
-    <span class="coll-stat"><span class="coll-stat-num">${items.length}</span> Eintraege</span>
-    <span class="coll-stat"><span class="coll-stat-num">${fmtEUR(stats.total)}</span> Gesamtwert</span>
-  `;
+  showCb.addEventListener('change', () => {
+    collection.setSettings({ showPhotos: showCb.checked });
+    draw();
+  });
 
+  const body = $('#coll-body');
   const empty = $('#coll-empty');
-  const list = $('#coll-list');
-  if (items.length === 0) {
-    empty.hidden = false;
-    list.hidden = true;
-    return;
-  }
-  empty.hidden = true;
-  list.hidden = false;
 
-  // Fotos vorab laden, wenn Anzeige aktiv
   let photoMap = {};
-  if (showCb.checked) {
-    try { photoMap = await getPhotos(items.map(it => it.photoId)); } catch {}
+
+  async function ensurePhotos(items) {
+    if (!showCb.checked) return;
+    const need = items.map(it => it.photoId).filter(id => !(id in photoMap));
+    if (!need.length) return;
+    try {
+      const map = await getPhotos(need);
+      photoMap = { ...photoMap, ...map };
+    } catch {}
   }
 
-  function drawList() {
+  function statHtml(items, brandCount) {
+    if (items.length === 0) return '';
+    const total = items.reduce((n, it) => n + (Number(it.price) || 0), 0);
+    return `
+      <span class="coll-stat"><span class="coll-stat-num">${items.length}</span> Autos</span>
+      <span class="coll-stat"><span class="coll-stat-num">${brandCount}</span> Marken</span>
+      <span class="coll-stat"><span class="coll-stat-num">${fmtEUR(total)}</span> Gesamtwert</span>
+    `;
+  }
+
+  function buildEntryCard(it) {
+    const card = document.createElement('div');
+    card.className = 'coll-card';
     const showPhotos = showCb.checked;
-    list.classList.toggle('coll-list--photos', showPhotos);
-    list.classList.toggle('coll-list--compact', !showPhotos);
-    list.innerHTML = '';
-    items.forEach(it => {
-      const card = document.createElement('div');
-      card.className = 'coll-card';
-      const photo = showPhotos && photoMap[it.photoId];
-      const photoHtml = showPhotos
-        ? (photo
-            ? `<div class="coll-photo"><img src="${photo}" alt="${escapeHtml(it.brand)} ${escapeHtml(it.model)}" loading="lazy" /></div>`
-            : `<div class="coll-photo coll-photo--missing">Foto fehlt</div>`)
-        : '';
-      const date = new Date(it.addedAt || 0).toLocaleDateString('de-DE');
-      card.innerHTML = `
-        ${photoHtml}
-        <div class="coll-meta">
-          <div class="coll-name">${escapeHtml(it.brand)} ${escapeHtml(it.model)}</div>
-          <div class="coll-price">${fmtEUR(it.price)}</div>
-          <div class="coll-date">${date}${it.playerName ? ` · ${escapeHtml(it.playerName)}` : ''}</div>
-        </div>
-        <button type="button" class="coll-del" aria-label="Aus Sammlung entfernen" data-id="${it.id}">✕</button>
-      `;
-      list.appendChild(card);
-    });
-    list.querySelectorAll('.coll-del').forEach(b => {
-      b.addEventListener('click', async () => {
+    const photo = showPhotos && photoMap[it.photoId];
+    const photoHtml = showPhotos
+      ? (photo
+          ? `<div class="coll-photo"><img src="${photo}" alt="${escapeHtml(it.brand)} ${escapeHtml(it.model)}" loading="lazy" /></div>`
+          : `<div class="coll-photo coll-photo--missing">Foto fehlt</div>`)
+      : '';
+    const date = new Date(it.addedAt || 0).toLocaleDateString('de-DE');
+    card.innerHTML = `
+      ${photoHtml}
+      <div class="coll-meta">
+        <div class="coll-name">${escapeHtml(it.brand)} ${escapeHtml(it.model)}</div>
+        <div class="coll-price">${fmtEUR(it.price)}</div>
+        <div class="coll-date">${date}${it.playerName ? ` · ${escapeHtml(it.playerName)}` : ''}</div>
+      </div>
+      <button type="button" class="coll-del" aria-label="Aus Sammlung entfernen" data-id="${it.id}">✕</button>
+    `;
+    return card;
+  }
+
+  function wireDeleteButtons(scope) {
+    scope.querySelectorAll('.coll-del').forEach(b => {
+      b.addEventListener('click', async (e) => {
+        e.stopPropagation();
         if (!confirm('Diesen Eintrag aus der Sammlung entfernen?')) return;
         await collection.removeEntry(b.dataset.id);
         renderCollection();
       });
     });
-    // Fotos lazy nachladen, falls erst spaeter aktiviert
-    if (showPhotos && Object.keys(photoMap).length === 0 && items.length > 0) {
-      getPhotos(items.map(it => it.photoId)).then(map => { photoMap = map; drawList(); });
+  }
+
+  async function draw() {
+    const items = collection.getAll();
+    const groups = collection.byBrand();
+    $('#coll-stats').innerHTML = statHtml(items, groups.length);
+
+    if (items.length === 0) {
+      body.hidden = true;
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+    body.hidden = false;
+    body.innerHTML = '';
+
+    if (activeTab === 'brands') {
+      await ensurePhotos(items);
+      groups.forEach(g => {
+        const sec = document.createElement('section');
+        sec.className = 'coll-brand' + (g.complete ? ' coll-brand--complete' : '');
+        const pct = Math.round(g.progress * 100);
+        const progressLabel = g.totalModels > 0
+          ? `<span class="coll-brand-frac">${g.uniqueCount} / ${g.totalModels}</span>`
+          : `<span class="coll-brand-frac">${g.uniqueCount} ${g.uniqueCount === 1 ? 'Modell' : 'Modelle'}</span>`;
+        const completeBadge = g.complete
+          ? `<span class="coll-brand-trophy" title="Komplett gesammelt">🏆 Komplett</span>` : '';
+        sec.innerHTML = `
+          <button type="button" class="coll-brand-head" aria-expanded="false">
+            <span class="coll-brand-badge">${brandBadgeHTML(g.brand, 'lg')}</span>
+            <span class="coll-brand-info">
+              <span class="coll-brand-title">
+                ${escapeHtml(g.brand)} ${completeBadge}
+              </span>
+              <span class="coll-brand-meta">
+                <span class="coll-brand-count">${g.count} ${g.count === 1 ? 'Auto' : 'Autos'}</span>
+                ${progressLabel}
+                <span class="coll-brand-value">${fmtEUR(g.value)}</span>
+              </span>
+              <span class="coll-brand-bar" aria-hidden="true">
+                <span class="coll-brand-bar-fill" style="width:${pct}%"></span>
+              </span>
+            </span>
+            <span class="coll-brand-chev" aria-hidden="true">▾</span>
+          </button>
+          <div class="coll-brand-list" hidden></div>
+        `;
+        const head = sec.querySelector('.coll-brand-head');
+        const list = sec.querySelector('.coll-brand-list');
+        list.classList.toggle('coll-list--photos', showCb.checked);
+        list.classList.toggle('coll-list--compact', !showCb.checked);
+        g.items.forEach(it => list.appendChild(buildEntryCard(it)));
+        wireDeleteButtons(list);
+        head.addEventListener('click', () => {
+          const open = list.hidden;
+          list.hidden = !open;
+          head.setAttribute('aria-expanded', open ? 'true' : 'false');
+          sec.classList.toggle('coll-brand--open', open);
+        });
+        body.appendChild(sec);
+      });
+    } else {
+      await ensurePhotos(items);
+      const list = document.createElement('div');
+      list.className = 'coll-list';
+      list.classList.toggle('coll-list--photos', showCb.checked);
+      list.classList.toggle('coll-list--compact', !showCb.checked);
+      items.forEach(it => list.appendChild(buildEntryCard(it)));
+      wireDeleteButtons(list);
+      body.appendChild(list);
     }
   }
-  drawList();
+
+  draw();
 }
 
 // ============================================================
@@ -942,6 +1044,7 @@ function gameToWire(g) {
     players: g.players.map(p => ({
       id: p.id, name: p.name, isHost: !!p.isHost,
       slots: p.slots.slice(), cooldownUntil: p.cooldownUntil || 0,
+      deleteStreak: p.deleteStreak || 0, streakDecayAt: p.streakDecayAt || 0,
     })),
   };
 }
@@ -953,6 +1056,7 @@ function wireToGame(w) {
     players: w.players.map(p => ({
       id: p.id, name: p.name, isHost: !!p.isHost,
       slots: p.slots.slice(), cooldownUntil: p.cooldownUntil || 0,
+      deleteStreak: p.deleteStreak || 0, streakDecayAt: p.streakDecayAt || 0,
     })),
   };
 }

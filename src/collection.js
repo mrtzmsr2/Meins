@@ -1,6 +1,7 @@
 // Persistente langfristige Sammlung — nur Eintraege MIT Foto.
 // Metadaten in localStorage, Bilder in IndexedDB (siehe photos.js).
 import { addPhoto, deletePhoto } from './photos.js';
+import { CARS } from './data/cars.js';
 
 const KEY = 'meins.collection.v1';
 const SETTINGS_KEY = 'meins.collection.settings';
@@ -71,9 +72,62 @@ export async function removeEntry(id) {
 export function stats() {
   const items = read();
   const total = items.reduce((n, it) => n + (Number(it.price) || 0), 0);
+  const brands = new Set(items.map(it => it.brand));
   return {
     count: items.length,
     total,
     max: items.reduce((m, it) => Math.max(m, Number(it.price) || 0), 0),
+    brandCount: brands.size,
   };
+}
+
+/** Gruppiert die Sammlung nach Marken inkl. Fortschritts-Statistik
+ *  (wie viele der in CARS vorhandenen Modelle pro Marke schon gesammelt sind). */
+export function byBrand() {
+  const items = read();
+
+  // Gesamtanzahl bekannter Modelle pro Marke aus CARS
+  const totalPerBrand = new Map();
+  for (const c of CARS) {
+    const set = totalPerBrand.get(c.brand) || new Set();
+    set.add(c.model);
+    totalPerBrand.set(c.brand, set);
+  }
+
+  const groups = new Map();
+  for (const it of items) {
+    const key = it.brand || 'Unbekannt';
+    if (!groups.has(key)) {
+      groups.set(key, { brand: key, items: [], uniqueModels: new Set(), value: 0, max: 0 });
+    }
+    const g = groups.get(key);
+    g.items.push(it);
+    g.uniqueModels.add(String(it.model || '').toLowerCase());
+    g.value += Number(it.price) || 0;
+    g.max = Math.max(g.max, Number(it.price) || 0);
+  }
+
+  const out = Array.from(groups.values()).map(g => {
+    const totalModels = (totalPerBrand.get(g.brand) || new Set()).size;
+    const ownedModels = g.uniqueModels.size;
+    return {
+      brand: g.brand,
+      items: g.items.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)),
+      count: g.items.length,
+      uniqueCount: ownedModels,
+      totalModels,
+      progress: totalModels > 0 ? Math.min(1, ownedModels / totalModels) : 0,
+      value: g.value,
+      max: g.max,
+      complete: totalModels > 0 && ownedModels >= totalModels,
+    };
+  });
+
+  // Sortierung: vollstaendige Marken zuerst, dann nach Anzahl, dann Wert
+  out.sort((a, b) => {
+    if (a.complete !== b.complete) return a.complete ? -1 : 1;
+    if (b.count !== a.count) return b.count - a.count;
+    return b.value - a.value;
+  });
+  return out;
 }

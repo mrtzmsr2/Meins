@@ -179,12 +179,16 @@
         <div class="coll-stats" id="coll-stats"></div>
       </div>
       <div class="coll-toolbar">
+        <div class="coll-tabs" role="tablist">
+          <button type="button" class="coll-tab active" data-tab="brands" role="tab" aria-selected="true">🏷️ Marken</button>
+          <button type="button" class="coll-tab" data-tab="all" role="tab" aria-selected="false">📋 Alle</button>
+        </div>
         <label class="coll-toggle">
           <input type="checkbox" id="coll-show-photos" />
           <span>Fotos anzeigen</span>
         </label>
       </div>
-      <div class="coll-list" id="coll-list"></div>
+      <div class="coll-body" id="coll-body"></div>
       <div class="coll-empty" id="coll-empty" hidden>
         <p>Noch keine Eintraege.</p>
         <p class="hint">In der Sammlung landen nur Autos mit <strong>Beweis-Foto</strong>. Beim Eintragen im Spiel kannst du eines aufnehmen.</p>
