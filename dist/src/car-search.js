@@ -1,7 +1,8 @@
 // Modal: car search with autocomplete + manual entry fallback.
-import { CARS } from './data/cars.js';
+import { CARS, MIN_CAR_PRICE } from './data/cars.js';
 import { store } from './store.js';
 import { fmtEUR, escapeHtml, norm } from './util.js';
+import { brandBadgeHTML } from './brands.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -65,9 +66,10 @@ export function openCarSearch(title) {
             <input class="text-input" id="cs-model" placeholder="Modell" maxlength="40" />
           </div>
           <div class="price-input-wrap">
-            <input class="text-input" id="cs-price" inputmode="numeric" placeholder="Preis (geschätzt)" />
+            <input class="text-input" id="cs-price" inputmode="numeric" placeholder="Preis (mind. 50.000 €)" />
             <span class="euro">€</span>
           </div>
+          <div class="price-hint" id="cs-price-hint" hidden>Mindestpreis 50.000 € — bei MEINS! zählen nur teure Autos.</div>
           <button class="primary" id="cs-save">Eintragen</button>
         </div>
         <button class="secondary" id="cs-toggle-manual">Anderes Auto eintragen</button>
@@ -103,7 +105,7 @@ export function openCarSearch(title) {
         row.type = 'button';
         row.className = 'search-row';
         row.innerHTML = `
-          <div class="em">${c.emoji || '🚗'}</div>
+          ${brandBadgeHTML(c.brand, 'sm')}
           <div>
             <div class="nm">${escapeHtml(c.brand)} ${escapeHtml(c.model)}</div>
             ${c.custom ? `<div class="meta">Eigenes Auto</div>` : ''}
@@ -150,7 +152,12 @@ export function openCarSearch(title) {
       const priceRaw = $('#cs-price', modal).value.replace(/[^\d]/g, '');
       const price = parseInt(priceRaw, 10);
       if (!brand || !model) { $('#cs-brand', modal).focus(); return; }
-      if (!price || price < 100) { $('#cs-price', modal).focus(); return; }
+      if (!price || price < MIN_CAR_PRICE) {
+        const hint = $('#cs-price-hint', modal);
+        if (hint) hint.hidden = false;
+        $('#cs-price', modal).focus();
+        return;
+      }
       const car = { brand, model, price, emoji: '🚗', custom: true };
       // Save to local DB so it shows up next time
       store.addCustomCar(car);

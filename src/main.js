@@ -9,6 +9,10 @@ import {
   MIN_SLOT_COUNT, MAX_SLOT_COUNT, MIN_COOLDOWN_SEC, MAX_COOLDOWN_SEC,
 } from './game.js';
 import { openCarSearch } from './car-search.js';
+import { brandBadgeHTML } from './brands.js';
+import { sounds, haptic } from './sounds.js';
+
+sounds.load();
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -18,6 +22,8 @@ const app = $('#app');
 let mp = null;
 let game = null;
 let cooldownTickHandle = null;
+let justAddedKey = null; // "playerId:slotIdx" — fuer Eintrag-Animation
+let gameStartedAt = 0;
 
 function toast(msg, ms = 1800) {
   const el = document.createElement('div');
@@ -31,7 +37,7 @@ function persistGame() {
   if (!game) return;
   if (game.mode !== 'single') return;        // nur Einzelgerät
   if (game.status !== 'playing') return;     // fertige Spiele nicht weiterspeichern
-  try { store.setSavedGame(game); } catch {}
+  try { store.setSavedGame({ ...game, startedAt: gameStartedAt || Date.now() }); } catch {}
 }
 function clearPersistedGame() {
   try { store.clearSavedGame(); } catch {}
@@ -123,6 +129,7 @@ function renderHome() {
           slotCount: saved.slotCount,
           cooldownSec: saved.cooldownSec,
         };
+        gameStartedAt = saved.startedAt || Date.now();
         renderGame();
       });
       // Discard-Link
@@ -239,6 +246,7 @@ function startSingleGame(names, opts = null) {
   });
   store.setLastGroup({ mode: 'single', players: names.map(n => ({ name: n })) });
   clearPersistedGame();
+  gameStartedAt = Date.now();
   persistGame();
   renderGame();
 }
@@ -264,6 +272,23 @@ function refreshGameView() {
     ? `Aktuell vorn: <strong>${escapeHtml(leader.name)}</strong> · ${fmtEUR(leader.total)}`
     : '';
 
+  // Live-Mini-Ranking
+  const mini = $('#game-mini-rank');
+  if (mini) {
+    if (sorted.some(p => p.total > 0)) {
+      mini.hidden = false;
+      mini.innerHTML = sorted.map((p, i) => `
+        <div class="mini-rank-row${i === 0 ? ' lead' : ''}">
+          <span class="mini-rank-pos">${i + 1}.</span>
+          <span class="mini-rank-name">${escapeHtml(p.name)}</span>
+          <span class="mini-rank-total">${fmtEUR(p.total)}</span>
+        </div>
+      `).join('');
+    } else {
+      mini.hidden = true;
+    }
+  }
+
   const grid = $('#players-grid');
   grid.innerHTML = '';
   game.players.forEach(p => grid.appendChild(buildPlayerCard(p)));
@@ -276,9 +301,24 @@ function refreshGameView() {
 
   startCooldownTickIfNeeded();
 
+  // Eintrag-Animation: nach Render einmal triggern
+  if (justAddedKey) {
+    const sel = `.slot[data-key="${justAddedKey}"]`;
+    requestAnimationFrame(() => {
+      const el = grid.querySelector(sel);
+      if (el) {
+        el.classList.add('slot-pop');
+        setTimeout(() => el.classList.remove('slot-pop'), 600);
+      }
+    });
+    justAddedKey = null;
+  }
+
   if (game.status === 'done') {
     clearPersistedGame();
-    setTimeout(() => renderSummary(game), 500);
+    sounds.win();
+    haptic.success();
+    setTimeout(() => renderSummary(game), 700);
   }
 }
 
@@ -334,13 +374,14 @@ function buildSlot(player, idx, car) {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'slot';
+  el.dataset.key = `${player.id}:${idx}`;
   const editable = canEditSlot(player);
   const cooling = isInCooldown(player);
 
   if (car) {
     el.classList.add('filled');
     el.innerHTML = `
-      <div class="slot-emoji">${car.emoji || '🚗'}</div>
+      <div class="slot-logo">${brandBadgeHTML(car.brand, 'lg')}</div>
       <div class="slot-name">${escapeHtml(car.brand)} ${escapeHtml(car.model)}</div>
       <div class="slot-price">${fmtEUR(car.price)}</div>
     `;
@@ -404,9 +445,14 @@ function handleAddCar(playerId, slotIdx, car) {
   }
   const res = setSlot(game, playerId, slotIdx, car);
   if (!res.ok && res.reason === 'cooldown') {
+    sounds.blocked(); haptic.error();
     toast('Noch im Cooldown — warte kurz.'); return;
   }
   if (mp?.isHost) mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+  justAddedKey = `${playerId}:${slotIdx}`;
+  if (Number(car?.price) >= 500000) sounds.jackpot();
+  else sounds.claim();
+  haptic.medium();
   persistGame();
   refreshGameView();
 }
@@ -420,6 +466,8 @@ function handleClearSlot(playerId, slotIdx) {
   const res = clearSlot(game, playerId, slotIdx);
   if (!res.ok) return;
   if (mp?.isHost) mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+  sounds.remove();
+  haptic.light();
   persistGame();
   refreshGameView();
 }
@@ -434,6 +482,29 @@ function renderSummary(state) {
   const winner = sorted[0];
   $('#summary-winner').textContent = winner ? winner.name : '–';
   $('#summary-sub').textContent = `${fmtEUR(winner?.total || 0)} · ${state.players.length} Spieler · ${state.slotCount * state.players.length} Autos`;
+
+  // Statistik-Box: teuerstes/billigstes Auto + Spielzeit
+  const allCars = [];
+  state.players.forEach(p => p.slots.forEach(c => { if (c) allCars.push({ ...c, owner: p.name }); }));
+  const stats = $('#summary-stats');
+  if (stats && allCars.length > 0) {
+    const sortedByPrice = [...allCars].sort((a, b) => b.price - a.price);
+    const top = sortedByPrice[0];
+    const bot = sortedByPrice[sortedByPrice.length - 1];
+    const duration = gameStartedAt ? Math.max(0, Date.now() - gameStartedAt) : 0;
+    const minutes = Math.floor(duration / 60000);
+    const seconds = Math.floor((duration % 60000) / 1000);
+    const durTxt = duration > 0
+      ? (minutes > 0 ? `${minutes} min ${seconds} s` : `${seconds} s`)
+      : '–';
+    stats.hidden = false;
+    stats.innerHTML = `
+      <div class="stat-row"><span class="stat-label">Teuerstes Auto</span><span class="stat-value">${escapeHtml(top.brand)} ${escapeHtml(top.model)} · ${fmtEUR(top.price)} <span class="stat-sub">(${escapeHtml(top.owner)})</span></span></div>
+      <div class="stat-row"><span class="stat-label">Günstigstes Auto</span><span class="stat-value">${escapeHtml(bot.brand)} ${escapeHtml(bot.model)} · ${fmtEUR(bot.price)} <span class="stat-sub">(${escapeHtml(bot.owner)})</span></span></div>
+      <div class="stat-row"><span class="stat-label">Spielzeit</span><span class="stat-value">${durTxt}</span></div>
+      <div class="stat-row"><span class="stat-label">Autos gesamt</span><span class="stat-value">${allCars.length}</span></div>
+    `;
+  }
 
   const list = $('#summary-ranking');
   sorted.forEach((p, i) => {
@@ -590,6 +661,7 @@ function mpStartGame() {
     slotCount: s.slotCount, cooldownSec: s.cooldownSec,
   });
   store.setLastGroup({ mode: 'multi', players: mp.players.map(p => ({ name: p.name })) });
+  gameStartedAt = Date.now();
   mp.host.broadcast({ type: 'state', state: gameToWire(game) });
   renderGame();
 }
@@ -709,6 +781,21 @@ $('#brand-home').addEventListener('click', () => {
     if (!confirm('Spiel verlassen?')) return;
   }
   renderHome();
+});
+
+// Mute-Toggle
+const muteBtn = document.getElementById('btn-mute');
+function refreshMuteBtn() {
+  if (!muteBtn) return;
+  muteBtn.textContent = sounds.isMuted() ? '🔇' : '🔊';
+  muteBtn.setAttribute('aria-pressed', sounds.isMuted() ? 'true' : 'false');
+  muteBtn.title = sounds.isMuted() ? 'Sound einschalten' : 'Sound ausschalten';
+}
+refreshMuteBtn();
+muteBtn?.addEventListener('click', () => {
+  sounds.setMuted(!sounds.isMuted());
+  refreshMuteBtn();
+  if (!sounds.isMuted()) sounds.tap();
 });
 
 // Auto-join on ?room=XXXX

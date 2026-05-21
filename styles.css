@@ -491,3 +491,107 @@ main {
   .game-head { top: 56px; }
   .multi-actions { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   ETAPPE 1 - Brand-Badges, Slot-Animation, Mini-Ranking, Stats
+   ============================================================ */
+
+/* Marken-Badge (stilisiertes Logo) */
+.logo-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0.5px; line-height: 1;
+  border-radius: 50%; aspect-ratio: 1/1;
+  text-align: center;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.10), 0 2px 6px rgba(0,0,0,0.4);
+  flex-shrink: 0;
+}
+.logo-badge--sm { width: 30px; height: 30px; font-size: 10px; }
+.logo-badge--md { width: 40px; height: 40px; font-size: 12px; }
+.logo-badge--lg { width: 56px; height: 56px; font-size: 14px; }
+.logo-badge--xl { width: 72px; height: 72px; font-size: 18px; }
+
+.slot-logo { display: flex; justify-content: center; margin-bottom: 6px; }
+
+/* Eintrag-Animation */
+@keyframes slot-pop-anim {
+  0%   { transform: scale(0.85); box-shadow: 0 0 0 0 rgba(255, 216, 77, 0.6); }
+  40%  { transform: scale(1.06); box-shadow: 0 0 0 8px rgba(255, 216, 77, 0.25); }
+  100% { transform: scale(1.00); box-shadow: 0 0 0 0 rgba(255, 216, 77, 0); }
+}
+.slot.slot-pop {
+  animation: slot-pop-anim 0.55s cubic-bezier(.22,1.5,.36,1) both;
+}
+
+/* Live-Mini-Ranking */
+.mini-rank {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 0 16px 12px;
+}
+.mini-rank-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.mini-rank-row.lead {
+  background: rgba(255, 216, 77, 0.12);
+  color: var(--accent);
+  font-weight: 600;
+  border: 1px solid rgba(255, 216, 77, 0.35);
+}
+.mini-rank-pos { font-weight: 700; opacity: 0.7; }
+.mini-rank-name { color: var(--text); font-weight: 600; }
+.mini-rank-row.lead .mini-rank-name { color: var(--accent); }
+.mini-rank-total { font-variant-numeric: tabular-nums; opacity: 0.85; }
+
+/* Statistik-Box im Summary */
+.summary-stats {
+  margin: 16px 0 24px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid; gap: 8px;
+}
+.stat-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; font-size: 14px;
+}
+.stat-label { color: var(--text-dim); flex-shrink: 0; }
+.stat-value { color: var(--text); font-weight: 600; text-align: right; }
+.stat-sub { color: var(--text-dim); font-weight: 400; font-size: 12px; }
+
+/* Mute-Button + Topnav-Buttons */
+.nav-btn {
+  font-size: 18px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  width: 38px; height: 38px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s, border-color .15s;
+}
+.nav-btn:hover { background: var(--surface-2); border-color: var(--border); }
+.nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Mindestpreis-Hinweis im Manual-Eintrag */
+.price-hint {
+  margin-top: 6px; padding: 8px 10px;
+  background: rgba(255, 107, 107, 0.10);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-radius: var(--radius);
+  color: var(--bad); font-size: 12px;
+}
+
+/* Bessere Fokus-Marken (Accessibility-Vorbereitung) */
+button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

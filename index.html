@@ -15,10 +15,12 @@
   <div id="bg-gradient" aria-hidden="true"></div>
 
   <header class="topbar">
-    <div class="brand" id="brand-home" role="button" tabindex="0" aria-label="MEINS!">
+    <div class="brand" id="brand-home" role="button" tabindex="0" aria-label="MEINS! — zurück zur Startseite">
       <img class="brand-logo" src="./assets/logo.png" alt="MEINS!" />
     </div>
-    <nav class="nav" id="topnav"></nav>
+    <nav class="nav" id="topnav">
+      <button class="icon-btn nav-btn" id="btn-mute" type="button" aria-label="Sound an/aus" title="Sound">🔊</button>
+    </nav>
   </header>
 
   <main id="app"></main>
@@ -128,9 +130,10 @@
         </div>
         <div class="game-head-mid" id="game-leader"></div>
         <div class="game-head-actions">
-          <button class="icon-btn" id="game-leave" title="Beenden">✕</button>
+          <button class="icon-btn" id="game-leave" title="Beenden" aria-label="Spiel beenden">✕</button>
         </div>
       </div>
+      <div class="mini-rank" id="game-mini-rank" hidden></div>
       <div class="players-grid" id="players-grid"></div>
       <div class="hud-tip" id="game-tip"></div>
     </section>
@@ -142,6 +145,7 @@
       <div class="trophy">🏆</div>
       <h1 class="summary-title"><span class="grad" id="summary-winner">–</span></h1>
       <div class="summary-sub" id="summary-sub"></div>
+      <div class="summary-stats" id="summary-stats" hidden></div>
       <div class="ranking" id="summary-ranking"></div>
       <div class="summary-actions">
         <button class="primary big" id="summary-rematch">↻ Nochmal mit gleicher Gruppe</button>
