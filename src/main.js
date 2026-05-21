@@ -800,49 +800,88 @@ async function renderCollection() {
 
     if (activeTab === 'brands') {
       await ensurePhotos(items);
+      const grid = document.createElement('div');
+      grid.className = 'coll-disc-grid';
       groups.forEach(g => {
-        const sec = document.createElement('section');
-        sec.className = 'coll-brand' + (g.complete ? ' coll-brand--complete' : '');
+        const wrap = document.createElement('div');
+        wrap.className = 'coll-disc-wrap';
+
+        const disc = document.createElement('button');
+        disc.type = 'button';
+        disc.className = 'coll-disc' + (g.complete ? ' coll-disc--complete' : '');
+        disc.setAttribute('aria-expanded', 'false');
         const pct = Math.round(g.progress * 100);
-        const progressLabel = g.totalModels > 0
-          ? `<span class="coll-brand-frac">${g.uniqueCount} / ${g.totalModels}</span>`
-          : `<span class="coll-brand-frac">${g.uniqueCount} ${g.uniqueCount === 1 ? 'Modell' : 'Modelle'}</span>`;
-        const completeBadge = g.complete
-          ? `<span class="coll-brand-trophy" title="Komplett gesammelt">🏆 Komplett</span>` : '';
-        sec.innerHTML = `
-          <button type="button" class="coll-brand-head" aria-expanded="false">
-            <span class="coll-brand-badge">${brandBadgeHTML(g.brand, 'lg')}</span>
-            <span class="coll-brand-info">
-              <span class="coll-brand-title">
-                ${escapeHtml(g.brand)} ${completeBadge}
-              </span>
-              <span class="coll-brand-meta">
-                <span class="coll-brand-count">${g.count} ${g.count === 1 ? 'Auto' : 'Autos'}</span>
-                ${progressLabel}
-                <span class="coll-brand-value">${fmtEUR(g.value)}</span>
-              </span>
-              <span class="coll-brand-bar" aria-hidden="true">
-                <span class="coll-brand-bar-fill" style="width:${pct}%"></span>
-              </span>
-            </span>
-            <span class="coll-brand-chev" aria-hidden="true">▾</span>
-          </button>
-          <div class="coll-brand-list" hidden></div>
+        // SVG-Ring: r=45, C=2*PI*r=282.74
+        const C = 282.74;
+        const dash = (g.progress * C).toFixed(2);
+        const fracText = g.totalModels > 0 ? `${g.uniqueCount}/${g.totalModels}` : `${g.uniqueCount}`;
+        disc.innerHTML = `
+          <span class="coll-disc-ring">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <circle class="coll-disc-track" cx="50" cy="50" r="45"></circle>
+              <circle class="coll-disc-fill" cx="50" cy="50" r="45"
+                stroke-dasharray="${dash} ${C}"></circle>
+            </svg>
+            <span class="coll-disc-badge">${brandBadgeHTML(g.brand, 'lg')}</span>
+            ${g.complete ? '<span class="coll-disc-trophy" aria-hidden="true">🏆</span>' : ''}
+          </span>
+          <span class="coll-disc-name">${escapeHtml(g.brand)}</span>
+          <span class="coll-disc-frac">${fracText}</span>
+          <span class="coll-disc-pct">${pct}%</span>
         `;
-        const head = sec.querySelector('.coll-brand-head');
-        const list = sec.querySelector('.coll-brand-list');
+
+        const detail = document.createElement('div');
+        detail.className = 'coll-disc-detail';
+        detail.hidden = true;
+        const detailHead = document.createElement('div');
+        detailHead.className = 'coll-disc-detail-head';
+        detailHead.innerHTML = `
+          <span class="coll-disc-detail-title">
+            ${brandBadgeHTML(g.brand, 'md')}
+            <strong>${escapeHtml(g.brand)}</strong>
+            <span class="coll-disc-detail-meta">${g.count} ${g.count === 1 ? 'Auto' : 'Autos'} · ${fmtEUR(g.value)}</span>
+          </span>
+          <button type="button" class="coll-disc-close" aria-label="Schließen">✕</button>
+        `;
+        const list = document.createElement('div');
+        list.className = 'coll-list';
         list.classList.toggle('coll-list--photos', showCb.checked);
         list.classList.toggle('coll-list--compact', !showCb.checked);
         g.items.forEach(it => list.appendChild(buildEntryCard(it)));
         wireDeleteButtons(list);
-        head.addEventListener('click', () => {
-          const open = list.hidden;
-          list.hidden = !open;
-          head.setAttribute('aria-expanded', open ? 'true' : 'false');
-          sec.classList.toggle('coll-brand--open', open);
+        detail.appendChild(detailHead);
+        detail.appendChild(list);
+
+        const close = () => {
+          detail.hidden = true;
+          disc.setAttribute('aria-expanded', 'false');
+          wrap.classList.remove('coll-disc-wrap--open');
+        };
+        disc.addEventListener('click', () => {
+          // alle anderen schliessen
+          grid.querySelectorAll('.coll-disc-wrap--open').forEach(w => {
+            if (w !== wrap) {
+              w.classList.remove('coll-disc-wrap--open');
+              w.querySelector('.coll-disc-detail').hidden = true;
+              w.querySelector('.coll-disc').setAttribute('aria-expanded', 'false');
+            }
+          });
+          const open = detail.hidden;
+          detail.hidden = !open;
+          disc.setAttribute('aria-expanded', open ? 'true' : 'false');
+          wrap.classList.toggle('coll-disc-wrap--open', open);
+          if (open) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         });
-        body.appendChild(sec);
+        detailHead.querySelector('.coll-disc-close').addEventListener('click', (e) => {
+          e.stopPropagation();
+          close();
+        });
+
+        wrap.appendChild(disc);
+        wrap.appendChild(detail);
+        grid.appendChild(wrap);
       });
+      body.appendChild(grid);
     } else {
       await ensurePhotos(items);
       const list = document.createElement('div');

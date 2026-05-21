@@ -860,6 +860,134 @@ button.remove {
 
 /* ----- Brand-Gruppen ----- */
 .coll-body { display: flex; flex-direction: column; gap: 10px; }
+
+/* ----- Marken-Discs (TopDrives-Style Ring) ----- */
+.coll-disc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 14px;
+}
+.coll-disc-wrap { display: contents; }
+.coll-disc-wrap--open .coll-disc {
+  background: var(--surface-2);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(80, 160, 255, 0.18);
+}
+
+.coll-disc {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 14px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--text);
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s, background 0.15s;
+}
+.coll-disc:hover { transform: translateY(-2px); border-color: var(--accent); }
+.coll-disc:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.coll-disc-ring {
+  position: relative;
+  width: 96px; height: 96px;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+}
+.coll-disc-ring svg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.coll-disc-track {
+  fill: none;
+  stroke: var(--surface-2);
+  stroke-width: 8;
+}
+.coll-disc-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s ease;
+}
+.coll-disc--complete .coll-disc-fill {
+  stroke: url(#coll-gold-grad);
+  stroke: #f0a02a;
+}
+.coll-disc-badge {
+  position: relative; z-index: 1;
+  display: inline-flex;
+  width: 64px; height: 64px;
+  align-items: center; justify-content: center;
+}
+.coll-disc-badge .brand-badge { width: 100%; height: 100%; }
+.coll-disc-trophy {
+  position: absolute;
+  top: -2px; right: -2px;
+  font-size: 18px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+  z-index: 2;
+}
+.coll-disc--complete {
+  border-color: rgba(240, 160, 42, 0.55);
+  background: linear-gradient(180deg, rgba(255,196,64,0.08), transparent 70%);
+}
+
+.coll-disc-name {
+  font-weight: 600; font-size: 13px;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  margin-top: 4px;
+}
+.coll-disc-frac {
+  font-weight: 700; font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.coll-disc-pct {
+  font-size: 11px; color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.coll-disc--complete .coll-disc-pct { color: #f0a02a; font-weight: 700; }
+
+/* Detail-Panel (volle Breite unter dem geklickten Ring) */
+.coll-disc-detail {
+  grid-column: 1 / -1;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+  animation: coll-disc-slide 0.2s ease;
+}
+@keyframes coll-disc-slide {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.coll-disc-detail-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+}
+.coll-disc-detail-title {
+  display: inline-flex; align-items: center; gap: 10px;
+  min-width: 0;
+}
+.coll-disc-detail-title strong { font-size: 16px; }
+.coll-disc-detail-meta {
+  font-size: 12px; color: var(--text-dim); font-weight: 500;
+}
+.coll-disc-close {
+  appearance: none; border: none; background: transparent;
+  color: var(--text-dim);
+  width: 32px; height: 32px; border-radius: 50%;
+  cursor: pointer; font-size: 14px;
+}
+.coll-disc-close:hover { background: var(--surface-2); color: var(--text); }
+
 .coll-brand {
   border: 1px solid var(--border);
   border-radius: var(--radius);
