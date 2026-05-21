@@ -1405,16 +1405,3 @@ if (roomParam) {
 } else {
   renderHome();
 }
-
-// Splash ausblenden — sofort nach erstem Render. Tap blendet ebenfalls aus.
-requestAnimationFrame(() => {
-  const splash = document.getElementById('app-splash');
-  if (!splash) return;
-  const hide = () => {
-    splash.classList.add('app-splash--hide');
-    setTimeout(() => splash.remove(), 600);
-  };
-  splash.addEventListener('click', hide, { once: true });
-  splash.addEventListener('touchstart', hide, { once: true, passive: true });
-  hide();
-});
