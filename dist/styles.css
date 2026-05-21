@@ -715,3 +715,118 @@ button.remove {
 
 /* Theme-Button-Gruppe */
 .nav { display: flex; gap: 4px; align-items: center; }
+
+/* ============================================================
+   ETAPPE 3 - Sammlung & Foto-Prompt
+   ============================================================ */
+
+/* Photo-Prompt Modal */
+.photo-prompt {
+  position: fixed; inset: 0;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0,0,0,0.55);
+  z-index: 1000;
+  padding: 16px;
+  animation: fade-in .15s ease-out;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.photo-prompt-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 20px 18px;
+  width: 100%; max-width: 420px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  animation: slide-up .2s ease-out;
+}
+@keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.photo-prompt-icon { font-size: 36px; margin-bottom: 6px; }
+.photo-prompt-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+.photo-prompt-sub { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.4; }
+.photo-prompt-actions { display: flex; flex-direction: column; gap: 8px; }
+.photo-prompt-actions button { width: 100%; min-height: 44px; }
+
+/* Sammlung */
+.view-collection { padding: 12px 20px 32px; }
+.coll-head { margin: 8px 0 12px; }
+.coll-head h2 { margin: 0 0 8px; }
+.coll-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.coll-stat { font-size: 13px; color: var(--text-dim); }
+.coll-stat-num { color: var(--text); font-weight: 700; }
+
+.coll-toolbar {
+  display: flex; align-items: center; gap: 12px;
+  margin: 8px 0 14px;
+  padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.coll-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px; cursor: pointer;
+  min-height: 32px;
+}
+.coll-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+.coll-empty {
+  padding: 32px 16px; text-align: center; color: var(--text-dim);
+  background: var(--surface); border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.coll-empty p { margin: 4px 0; }
+.coll-empty .hint { font-size: 13px; }
+
+.coll-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* Compact-Variante (ohne Fotos) */
+.coll-list--compact .coll-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+.coll-list--compact .coll-photo { display: none; }
+.coll-list--compact .coll-meta { display: contents; }
+.coll-list--compact .coll-name { font-weight: 600; }
+.coll-list--compact .coll-price { font-weight: 700; font-variant-numeric: tabular-nums; }
+.coll-list--compact .coll-date { font-size: 12px; color: var(--text-dim); display: none; }
+
+/* Foto-Variante */
+.coll-list--photos .coll-card {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  gap: 12px;
+  padding: 8px;
+  align-items: center;
+}
+.coll-list--photos .coll-photo {
+  width: 80px; height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center;
+}
+.coll-list--photos .coll-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.coll-list--photos .coll-photo--missing { color: var(--text-dim); font-size: 11px; }
+.coll-list--photos .coll-meta { min-width: 0; }
+.coll-list--photos .coll-name { font-weight: 600; font-size: 15px; }
+.coll-list--photos .coll-price { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+.coll-list--photos .coll-date { font-size: 12px; color: var(--text-dim); }
+
+.coll-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.coll-del {
+  background: transparent; border: none;
+  color: var(--text-dim);
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+}
+.coll-del:hover { background: var(--surface-2); color: var(--bad); }
+.coll-del:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

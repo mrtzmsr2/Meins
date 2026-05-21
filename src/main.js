@@ -13,6 +13,9 @@ import { brandBadgeHTML } from './brands.js';
 import { sounds, haptic } from './sounds.js';
 import { AVATAR_POOL, nextAvatar, avatarHTML } from './avatars.js';
 import { theme, applyTheme } from './theme.js';
+import { pickAndCompressPhoto } from './photo-capture.js';
+import * as collection from './collection.js';
+import { getPhoto, getPhotos } from './photos.js';
 
 sounds.load();
 applyTheme();
@@ -171,6 +174,9 @@ function renderHome() {
     });
   }
   $('#btn-new-game').addEventListener('click', renderSetup);
+
+  const collBtn = $('#btn-collection');
+  collBtn?.addEventListener('click', renderCollection);
 
   // Gespeicherte Gruppen
   const groups = store.getGroups();
@@ -536,6 +542,53 @@ function handleAddCar(playerId, slotIdx, car) {
   haptic.medium();
   persistGame();
   refreshGameView();
+
+  // Optionales Beweis-Foto -> Sammlung (nur Single-Device)
+  if (game.mode === 'single') {
+    const player = game.players.find(p => p.id === playerId);
+    askPhotoAndCollect(car, player?.name).catch(e => console.warn('[photo]', e));
+  }
+}
+
+async function askPhotoAndCollect(car, playerName) {
+  const want = await openPhotoPrompt();
+  if (!want) return;
+  const dataUrl = await pickAndCompressPhoto();
+  if (!dataUrl) { toast('Kein Foto aufgenommen'); return; }
+  try {
+    await collection.addEntry({
+      brand: car.brand, model: car.model, price: car.price,
+      dataUrl, playerName: playerName || null,
+    });
+    toast('Zur Sammlung hinzugefuegt');
+    haptic.success();
+  } catch (e) {
+    console.warn('[collection]', e);
+    toast('Konnte nicht gespeichert werden');
+  }
+}
+
+function openPhotoPrompt() {
+  return new Promise((resolve) => {
+    const root = document.getElementById('modal-root');
+    if (!root) return resolve(false);
+    root.innerHTML = '';
+    root.hidden = false;
+    const node = tpl('tpl-photo-prompt');
+    root.appendChild(node);
+    const close = (val) => {
+      root.hidden = true;
+      root.innerHTML = '';
+      resolve(val);
+    };
+    root.querySelector('[data-act="take"]').addEventListener('click', () => close(true));
+    root.querySelector('[data-act="skip"]').addEventListener('click', () => close(false));
+    // Klick aufs Backdrop schliesst
+    const backdrop = root.querySelector('.photo-prompt');
+    backdrop?.addEventListener('click', (e) => {
+      if (e.target === backdrop) close(false);
+    });
+  });
 }
 
 function handleClearSlot(playerId, slotIdx) {
@@ -620,6 +673,87 @@ function renderSummary(state) {
     }
   });
   $('#summary-home').addEventListener('click', renderHome);
+}
+
+// ============================================================
+// COLLECTION (langfristig, fotopflichtig)
+// ============================================================
+async function renderCollection() {
+  cleanupSession();
+  app.innerHTML = '';
+  app.appendChild(tpl('tpl-collection'));
+  $('#coll-back').addEventListener('click', renderHome);
+
+  const items = collection.getAll();
+  const settings = collection.getSettings();
+  const showCb = $('#coll-show-photos');
+  showCb.checked = !!settings.showPhotos;
+  showCb.addEventListener('change', () => {
+    collection.setSettings({ showPhotos: showCb.checked });
+    drawList();
+  });
+
+  const stats = collection.stats();
+  $('#coll-stats').innerHTML = items.length === 0 ? '' : `
+    <span class="coll-stat"><span class="coll-stat-num">${items.length}</span> Eintraege</span>
+    <span class="coll-stat"><span class="coll-stat-num">${fmtEUR(stats.total)}</span> Gesamtwert</span>
+  `;
+
+  const empty = $('#coll-empty');
+  const list = $('#coll-list');
+  if (items.length === 0) {
+    empty.hidden = false;
+    list.hidden = true;
+    return;
+  }
+  empty.hidden = true;
+  list.hidden = false;
+
+  // Fotos vorab laden, wenn Anzeige aktiv
+  let photoMap = {};
+  if (showCb.checked) {
+    try { photoMap = await getPhotos(items.map(it => it.photoId)); } catch {}
+  }
+
+  function drawList() {
+    const showPhotos = showCb.checked;
+    list.classList.toggle('coll-list--photos', showPhotos);
+    list.classList.toggle('coll-list--compact', !showPhotos);
+    list.innerHTML = '';
+    items.forEach(it => {
+      const card = document.createElement('div');
+      card.className = 'coll-card';
+      const photo = showPhotos && photoMap[it.photoId];
+      const photoHtml = showPhotos
+        ? (photo
+            ? `<div class="coll-photo"><img src="${photo}" alt="${escapeHtml(it.brand)} ${escapeHtml(it.model)}" loading="lazy" /></div>`
+            : `<div class="coll-photo coll-photo--missing">Foto fehlt</div>`)
+        : '';
+      const date = new Date(it.addedAt || 0).toLocaleDateString('de-DE');
+      card.innerHTML = `
+        ${photoHtml}
+        <div class="coll-meta">
+          <div class="coll-name">${escapeHtml(it.brand)} ${escapeHtml(it.model)}</div>
+          <div class="coll-price">${fmtEUR(it.price)}</div>
+          <div class="coll-date">${date}${it.playerName ? ` · ${escapeHtml(it.playerName)}` : ''}</div>
+        </div>
+        <button type="button" class="coll-del" aria-label="Aus Sammlung entfernen" data-id="${it.id}">✕</button>
+      `;
+      list.appendChild(card);
+    });
+    list.querySelectorAll('.coll-del').forEach(b => {
+      b.addEventListener('click', async () => {
+        if (!confirm('Diesen Eintrag aus der Sammlung entfernen?')) return;
+        await collection.removeEntry(b.dataset.id);
+        renderCollection();
+      });
+    });
+    // Fotos lazy nachladen, falls erst spaeter aktiviert
+    if (showPhotos && Object.keys(photoMap).length === 0 && items.length > 0) {
+      getPhotos(items.map(it => it.photoId)).then(map => { photoMap = map; drawList(); });
+    }
+  }
+  drawList();
 }
 
 // ============================================================

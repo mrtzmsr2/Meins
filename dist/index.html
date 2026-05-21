@@ -36,6 +36,7 @@
       <div class="home-actions">
         <button class="primary big" id="btn-new-game">🏁 Neues Spiel</button>
         <button class="secondary" id="btn-rematch" hidden>↻ Letzte Gruppe wieder spielen</button>
+        <button class="secondary" id="btn-collection" type="button">📚 Meine Sammlung</button>
       </div>
 
       <div class="home-groups" id="home-groups" hidden>
@@ -163,6 +164,43 @@
   </template>
 
   <div class="modal-root" id="modal-root" hidden></div>
+
+  <!-- ============== COLLECTION ============== -->
+  <template id="tpl-collection">
+    <section class="view view-collection">
+      <button class="ghost-link" id="coll-back">← Zurück</button>
+      <div class="coll-head">
+        <h2>Meine Sammlung</h2>
+        <div class="coll-stats" id="coll-stats"></div>
+      </div>
+      <div class="coll-toolbar">
+        <label class="coll-toggle">
+          <input type="checkbox" id="coll-show-photos" />
+          <span>Fotos anzeigen</span>
+        </label>
+      </div>
+      <div class="coll-list" id="coll-list"></div>
+      <div class="coll-empty" id="coll-empty" hidden>
+        <p>Noch keine Eintraege.</p>
+        <p class="hint">In der Sammlung landen nur Autos mit <strong>Beweis-Foto</strong>. Beim Eintragen im Spiel kannst du eines aufnehmen.</p>
+      </div>
+    </section>
+  </template>
+
+  <!-- ============== PHOTO PROMPT (modal) ============== -->
+  <template id="tpl-photo-prompt">
+    <div class="photo-prompt">
+      <div class="photo-prompt-card">
+        <div class="photo-prompt-icon">📷</div>
+        <div class="photo-prompt-title">Beweis-Foto?</div>
+        <div class="photo-prompt-sub">Mit Foto landet das Auto in deiner Sammlung. Ohne Foto wird es nur fuer dieses Spiel gezaehlt.</div>
+        <div class="photo-prompt-actions">
+          <button type="button" class="primary" data-act="take">📷 Foto aufnehmen</button>
+          <button type="button" class="secondary" data-act="skip">Ueberspringen</button>
+        </div>
+      </div>
+    </div>
+  </template>
 
   <script type="module" src="./src/main.js"></script>
 </body>

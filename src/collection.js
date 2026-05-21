@@ -1,0 +1,79 @@
+// Persistente langfristige Sammlung — nur Eintraege MIT Foto.
+// Metadaten in localStorage, Bilder in IndexedDB (siehe photos.js).
+import { addPhoto, deletePhoto } from './photos.js';
+
+const KEY = 'meins.collection.v1';
+const SETTINGS_KEY = 'meins.collection.settings';
+
+function read() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+function write(items) {
+  try { localStorage.setItem(KEY, JSON.stringify(items)); } catch {}
+}
+
+export function getSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    return raw ? JSON.parse(raw) : { showPhotos: true };
+  } catch { return { showPhotos: true }; }
+}
+export function setSettings(patch) {
+  const s = { ...getSettings(), ...patch };
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch {}
+  return s;
+}
+
+/**
+ * Add an entry to the collection. Photo is REQUIRED (proof rule).
+ * @param {{brand:string, model:string, price:number, dataUrl:string, playerName?:string}} entry
+ */
+export async function addEntry(entry) {
+  if (!entry?.dataUrl) throw new Error('Foto erforderlich');
+  const photoId = await addPhoto(entry.dataUrl);
+  const id = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const items = read();
+  items.unshift({
+    id,
+    brand: String(entry.brand || ''),
+    model: String(entry.model || ''),
+    price: Number(entry.price) || 0,
+    photoId,
+    playerName: entry.playerName || null,
+    addedAt: Date.now(),
+  });
+  // Soft-Limit
+  const trimmed = items.slice(0, 500);
+  write(trimmed);
+  return id;
+}
+
+export function getAll() {
+  return read().slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+}
+
+export async function removeEntry(id) {
+  const items = read();
+  const idx = items.findIndex(it => it.id === id);
+  if (idx === -1) return;
+  const it = items[idx];
+  items.splice(idx, 1);
+  write(items);
+  if (it.photoId != null) {
+    try { await deletePhoto(it.photoId); } catch {}
+  }
+}
+
+export function stats() {
+  const items = read();
+  const total = items.reduce((n, it) => n + (Number(it.price) || 0), 0);
+  return {
+    count: items.length,
+    total,
+    max: items.reduce((m, it) => Math.max(m, Number(it.price) || 0), 0),
+  };
+}
