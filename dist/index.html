@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#05070b" />
+  <title>MEINS! – Wer sammelt die teuersten Autos?</title>
+  <meta name="description" content="Das Autospiel: 'Meins!' rufen, Auto sichern, Preis nachschlagen. Wer die teuerste Sammlung hat, gewinnt." />
+  <link rel="icon" href="./assets/logo.png" type="image/png" />
+  <link rel="apple-touch-icon" href="./assets/logo.png" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" defer></script>
+</head>
+<body>
+  <div id="bg-gradient" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand" id="brand-home" role="button" tabindex="0" aria-label="MEINS!">
+      <img class="brand-logo" src="./assets/logo.png" alt="MEINS!" />
+    </div>
+    <nav class="nav" id="topnav"></nav>
+  </header>
+
+  <main id="app"></main>
+
+  <!-- ============== HOME ============== -->
+  <template id="tpl-home">
+    <section class="view view-home">
+      <img class="hero-logo" src="./assets/logo.png" alt="MEINS!" />
+      <p class="hero-sub">Sag „Meins!" wenn ein teures Auto vorbeifährt. Wer zuerst ruft, sichert es. Jeder hat <strong>3 Slots</strong>. Wer am Ende die teuerste Sammlung hat, gewinnt.</p>
+
+      <div class="home-actions">
+        <button class="primary big" id="btn-new-game">🏁 Neues Spiel</button>
+        <button class="secondary" id="btn-rematch" hidden>↻ Letzte Gruppe wieder spielen</button>
+      </div>
+
+      <div class="rules">
+        <h3>So geht's</h3>
+        <ol>
+          <li><strong>Gruppe erstellen</strong> — auf einem Gerät zusammen, oder jedes Handy einzeln.</li>
+          <li>Auto fährt vorbei → laut <strong>"Meins!"</strong> rufen. Wer zuerst ruft, kriegt es.</li>
+          <li>Auto in der App eintragen — der Preis wird automatisch gesucht.</li>
+          <li>Wenn alle 3 Slots voll sind, gewinnt die <strong>teuerste Sammlung</strong>.</li>
+        </ol>
+      </div>
+    </section>
+  </template>
+
+  <!-- ============== SETUP ============== -->
+  <template id="tpl-setup">
+    <section class="view view-setup">
+      <button class="ghost-link" id="setup-back">← Zurück</button>
+      <h2>Neues Spiel</h2>
+
+      <!-- Single-device setup (default) -->
+      <div class="setup-pane" id="setup-single">
+        <div class="setup-hint">Spielernamen eintragen — alle spielen auf diesem einen Gerät.</div>
+        <form class="player-input-row" id="single-form">
+          <input class="text-input" id="single-name" type="text" placeholder="Name" maxlength="20" autocomplete="off" />
+          <button class="primary" type="submit">+ Hinzufügen</button>
+        </form>
+        <div class="player-list" id="single-players"></div>
+        <div class="settings-block" id="single-settings"></div>
+        <button class="primary big" id="single-start" disabled>Spiel starten</button>
+        <button type="button" class="ghost-link mode-switch" id="switch-to-multi">📡 Lieber auf mehreren Geräten spielen?</button>
+      </div>
+
+      <!-- Multi-device setup -->
+      <div class="setup-pane" id="setup-multi" hidden>
+        <div class="setup-hint">Jeder Spieler ist auf seinem eigenen Handy. Ein Spieler eröffnet das Spiel, alle anderen treten mit einem 4-stelligen Code bei.</div>
+        <input class="text-input" id="multi-name" type="text" placeholder="Dein Name" maxlength="20" autocomplete="off" />
+        <div class="role-cards">
+          <button type="button" class="role-card" id="multi-create">
+            <div class="role-card-icon">👑</div>
+            <div class="role-card-body">
+              <div class="role-card-title">Ich bin der Erste</div>
+              <div class="role-card-desc">Raum eröffnen und Code an die anderen weitergeben. Du bist Rundenmeister.</div>
+            </div>
+          </button>
+          <button type="button" class="role-card" id="multi-join">
+            <div class="role-card-icon">🚪</div>
+            <div class="role-card-body">
+              <div class="role-card-title">Ich habe einen Code</div>
+              <div class="role-card-desc">Raum-Code eingeben und einem Spiel beitreten.</div>
+            </div>
+          </button>
+        </div>
+        <button type="button" class="ghost-link mode-switch" id="switch-to-single">← Zurück zu „Ein Gerät"</button>
+      </div>
+    </section>
+  </template>
+
+  <!-- ============== ROOM (multi) ============== -->
+  <template id="tpl-room">
+    <section class="view view-room">
+      <button class="ghost-link" id="room-back">← Zurück</button>
+      <div class="mp-room-head">
+        <div>
+          <div class="mp-label">Raum-Code</div>
+          <div class="mp-code" id="room-code">––––</div>
+        </div>
+        <div class="mp-room-actions">
+          <button class="icon-btn" id="room-share" title="Code teilen">📋</button>
+        </div>
+      </div>
+      <div class="mp-role" id="room-role"></div>
+      <div class="player-list" id="room-players"></div>
+      <div id="room-host-controls" hidden>
+        <div class="settings-block" id="room-settings"></div>
+        <button class="primary big" id="room-start">Spiel starten</button>
+      </div>
+      <div id="room-join-input" hidden>
+        <div class="setup-hint">Gib den 4-stelligen Code ein:</div>
+        <input class="mp-input" id="room-code-input" maxlength="4" placeholder="ABCD" autocomplete="off" inputmode="text" />
+        <button class="primary" id="room-go">Beitreten</button>
+      </div>
+      <div class="mp-status" id="room-status" hidden></div>
+    </section>
+  </template>
+
+  <!-- ============== GAME ============== -->
+  <template id="tpl-game">
+    <section class="view view-game">
+      <div class="game-head">
+        <div>
+          <div class="hud-label">Fortschritt</div>
+          <div class="hud-progress" id="game-progress">0/0</div>
+        </div>
+        <div class="game-head-mid" id="game-leader"></div>
+        <div class="game-head-actions">
+          <button class="icon-btn" id="game-leave" title="Beenden">✕</button>
+        </div>
+      </div>
+      <div class="players-grid" id="players-grid"></div>
+      <div class="hud-tip" id="game-tip"></div>
+    </section>
+  </template>
+
+  <!-- ============== SUMMARY ============== -->
+  <template id="tpl-summary">
+    <section class="view view-summary">
+      <div class="trophy">🏆</div>
+      <h1 class="summary-title"><span class="grad" id="summary-winner">–</span></h1>
+      <div class="summary-sub" id="summary-sub"></div>
+      <div class="ranking" id="summary-ranking"></div>
+      <div class="summary-actions">
+        <button class="primary big" id="summary-rematch">↻ Nochmal mit gleicher Gruppe</button>
+        <button class="secondary" id="summary-home">Hauptmenü</button>
+      </div>
+    </section>
+  </template>
+
+  <div class="modal-root" id="modal-root" hidden></div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
