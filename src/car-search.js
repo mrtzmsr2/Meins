@@ -57,7 +57,7 @@ export function openCarSearch(title) {
       <button class="icon-btn modal-close" aria-label="Schließen">✕</button>
       <h2>${escapeHtml(title)}</h2>
       <div class="car-search">
-        <input class="text-input" id="cs-q" type="text" placeholder="Marke + Modell (z. B. „BMW M3")" autocomplete="off" autofocus />
+        <input class="text-input" id="cs-q" type="text" placeholder="Marke + Modell (z. B. „BMW M3“)" autocomplete="off" autofocus />
         <div class="search-results" id="cs-results"></div>
         <div class="manual-block" id="cs-manual" hidden>
           <h3>Nicht in der Liste? Manuell eintragen</h3>
