@@ -64,6 +64,11 @@ export const CONFIRM = {
     body: 'Das laufende Spiel wird abgebrochen — der aktuelle Stand bleibt aber gemerkt.',
     ok: 'Beenden',
   },
+  finishEarly: {
+    title: 'Jetzt auswerten?',
+    body: 'Das Spiel endet hier — gewertet wird mit den bisher belegten Slots.',
+    ok: 'Auswerten',
+  },
   leaveMulti: {
     title: 'Spiel verlassen?',
     body: 'Du gehst zurück zum Hauptmenü.',

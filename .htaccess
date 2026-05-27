@@ -1,0 +1,71 @@
+# ============================================================
+# MEINS! - .htaccess fuer Strato Webhosting
+# Diese Datei gehoert ins ROOT-Verzeichnis der Domain
+# ============================================================
+
+# --- MIME-Types ---
+AddType application/manifest+json .webmanifest
+AddType image/svg+xml             .svg
+AddType text/javascript           .js
+AddType text/css                  .css
+
+# --- Service-Worker NIEMALS cachen (sonst kommen Updates nie an) ---
+<Files "service-worker.js">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </IfModule>
+</Files>
+
+# --- index.html nur kurz cachen ---
+<Files "index.html">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, must-revalidate"
+  </IfModule>
+</Files>
+
+# --- manifest.webmanifest nicht aggressiv cachen ---
+<Files "manifest.webmanifest">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, must-revalidate"
+  </IfModule>
+</Files>
+
+# --- Statische Assets (JS/CSS/Bilder/Fonts) lange cachen ---
+<FilesMatch "\.(js|css|svg|png|jpg|jpeg|webp|woff2|woff|ttf|ico)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </IfModule>
+</FilesMatch>
+
+# --- Sicherheits-Header ---
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+  Header set Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+</IfModule>
+
+# --- HTTP -> HTTPS Weiterleitung (deaktiviert fuer Test ohne SSL) ---
+# <IfModule mod_rewrite.c>
+#   RewriteEngine On
+#   RewriteCond %{HTTPS} off
+#   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
+
+# --- Single-Page-App Fallback (direkte URLs auf index.html lenken) ---
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# --- Kompression aktivieren ---
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml application/manifest+json
+</IfModule>
+
+# --- Verzeichnis-Listing deaktivieren ---
+Options -Indexes

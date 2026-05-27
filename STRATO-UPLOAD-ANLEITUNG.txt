@@ -1,0 +1,133 @@
+============================================================
+  MEINS! - Strato Upload Anleitung
+============================================================
+
+Dieses Paket enthält alles, was du brauchst, um die App
+unter www.meinsgame.de bei Strato live zu schalten.
+
+============================================================
+  WAS LIEGT WO?
+============================================================
+
+  meinsgame-strato.zip      <-- ZIP mit allem zum Hochladen
+  strato-upload\            <-- Entpackte Version (gleicher Inhalt)
+                                Falls dein FTP-Client einzelne
+                                Dateien lieber mag.
+
+  Inhalt:
+    .htaccess               <- WICHTIG! Konfiguriert HTTPS, Caching,
+                               MIME-Types. Diese Datei ist im
+                               Windows-Explorer ggf. versteckt.
+    index.html              <- Startseite
+    styles.css              <- Layout / Design
+    service-worker.js       <- PWA Offline-Cache (v4-21p)
+    manifest.webmanifest    <- PWA Konfiguration
+    src\                    <- Komplette App-Logik (12 Module)
+    assets\                 <- Logo + sonstige Bilder
+
+  GESAMT: 24 Dateien, ~56 KB gepackt, ~250 KB entpackt.
+
+============================================================
+  HOCHLADEN - SCHRITT FÜR SCHRITT
+============================================================
+
+  Voraussetzung: SFTP-Zugang bei Strato (siehe vorige Anleitung).
+
+  --- METHODE A: ZIP per Strato File-Manager ---
+
+  Manche Strato-Tarife haben einen Web-File-Manager:
+   1. Im Strato Kundenbereich -> "Hosting" -> "File-Manager"
+   2. Ins Verzeichnis deiner Domain navigieren
+      (meist /meinsgame.de/ oder /htdocs/)
+   3. ALLE alten Dateien dort loeschen (falls schon was drin ist)
+   4. meinsgame-strato.zip hochladen
+   5. Im File-Manager: Rechtsklick aufs ZIP -> "Entpacken"
+   6. Das ZIP nach dem Entpacken loeschen
+   7. Fertig.
+
+  --- METHODE B: FileZilla (SFTP) ---
+
+   1. FileZilla oeffnen
+   2. Mit SFTP-Daten verbinden:
+        Protokoll:  SFTP - SSH File Transfer Protocol
+        Server:     ssh.strato.de   (oder was Strato dir genannt hat)
+        Port:       22
+        Benutzer:   dein SFTP-User
+        Passwort:   dein SFTP-Passwort
+   3. Rechts (Server): ins Verzeichnis deiner Domain wechseln
+      (meist /meinsgame.de/ oder /htdocs/)
+   4. Links (lokal): in den Ordner strato-upload\ navigieren
+   5. ALLE Dateien und Ordner aus strato-upload\ markieren (Strg+A)
+   6. Per Drag&Drop nach rechts ziehen -> Upload startet
+   7. Bei "Datei existiert bereits": "Ueberschreiben" waehlen
+   8. Fertig wenn unten "0 Dateien in Warteschlange" steht.
+
+  WICHTIG: .htaccess wird oft als "versteckt" interpretiert.
+           In FileZilla unter "Server" -> "Versteckte Dateien
+           anzeigen" aktivieren, sonst siehst du sie nicht.
+
+============================================================
+  NACH DEM UPLOAD - TESTEN
+============================================================
+
+   1. https://www.meinsgame.de im Browser oeffnen
+      -> App muss laden mit Logo und "Neues Spiel"-Button
+
+   2. Chrome DevTools (F12) -> Console
+      -> Keine roten Fehler? Gut!
+
+   3. DevTools -> Application -> Service Workers
+      -> Status muss "activated and is running" sein
+      -> Cache-Name endet auf "v4-2026-05-21p"
+
+   4. Auf dem iPhone in Safari oeffnen
+      -> "Teilen" -> "Zum Home-Bildschirm"
+      -> App startet als eigene PWA
+
+============================================================
+  WENN ES NICHT GEHT
+============================================================
+
+  Problem: Seite zeigt 403 Forbidden / 500 Error
+    Loesung: .htaccess pruefen - liegt sie im richtigen
+             Verzeichnis? Strato unterstuetzt evtl. nicht
+             alle Module. Notfalls .htaccess umbenennen,
+             dann lieferen wir's neu zugeschnitten.
+
+  Problem: Seite zeigt nur weiss/schwarz
+    Loesung: DevTools (F12) -> Console -> roten Fehler senden.
+             Meist fehlt eine Datei oder MIME-Type stimmt nicht.
+
+  Problem: Service-Worker registriert nicht / kein Offline
+    Loesung: HTTPS muss aktiv sein. Strato Kundenbereich
+             -> SSL -> "Let's Encrypt" + "HTTPS erzwingen".
+
+  Problem: Multiplayer geht nicht
+    Loesung: Funktioniert auch unter eigener Domain - PeerJS
+             nutzt eigene Cloud, unabhaengig von Strato.
+             Falls "Verbinde..." haengt: beide Geraete sollten
+             nicht im gleichen NAT-Symmetric-Mobilfunknetz sein.
+
+============================================================
+  UPDATES SPAETER EINSPIELEN
+============================================================
+
+  Nach jeder neuen Version (z.B. nach einem Code-Update):
+
+   1. In PowerShell im Projektordner:
+        .\build-strato.ps1    (falls vorhanden)
+      oder manuell das Paket neu bauen.
+
+   2. Komplettes strato-upload\ neu hochladen, alle Dateien
+      ueberschreiben.
+
+   3. PWA auf dem Handy aus dem App-Switcher schmeissen und
+      neu oeffnen - der Service-Worker laedt die neue Version.
+
+  Der Cache-Name (z.B. "meins-v4-2026-05-21p") wird bei jedem
+  Push automatisch hochgezaehlt, damit alte Daten ersetzt
+  werden.
+
+============================================================
+  FERTIG. Viel Erfolg!
+============================================================

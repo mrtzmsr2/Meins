@@ -348,6 +348,25 @@ function renderGame() {
   $('#game-leave').addEventListener('click', () => {
     (async () => { if (await customConfirm(CONFIRM.endGame)) renderHome(); })();
   });
+  // "Auswertung jetzt"-Button: nur Single-Mode oder Multi-Host darf vorzeitig auswerten
+  const finishBtn = $('#game-finish');
+  if (finishBtn) {
+    const canFinish = game?.mode === 'single' || !!mp?.isHost;
+    if (canFinish) {
+      finishBtn.hidden = false;
+      finishBtn.addEventListener('click', () => {
+        (async () => {
+          if (!(await customConfirm(CONFIRM.finishEarly))) return;
+          if (!game) return;
+          game.status = 'done';
+          if (mp?.isHost) {
+            mp.host.broadcast({ type: 'state', state: gameToWire(game) });
+          }
+          refreshGameView();
+        })();
+      });
+    }
+  }
   // Im Multiplayer-Hostmodus: Code-Banner einblenden, damit Mitspieler jederzeit beitreten koennen
   if (game?.mode === 'multi' && mp?.isHost && mp.host?.roomCode) {
     const view = app.querySelector('.view-game');
