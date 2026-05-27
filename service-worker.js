@@ -2,7 +2,7 @@
 // Strategie: cache-first fuer App-Shell + statische Assets, network-first fuer
 // HTML (damit Updates ankommen). PeerJS-CDN wird beim ersten Mal gecached.
 
-const VERSION = 'meins-v4-2026-05-27b';
+const VERSION = 'meins-v4-2026-05-27c';
 const APP_SHELL = [
   './',
   './index.html',
