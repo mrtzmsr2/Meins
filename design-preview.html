@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MEINS! — Design-Vorschau Boxen</title>
+<style>
+  :root{
+    --bg:#0a0a0a; --surface:#141414; --surface-2:#1c1c1c;
+    --border:#262626; --border-strong:#3a3a3a;
+    --text:#fff; --text-dim:#9a9a9a;
+    --accent:#ffd84d; --good:#4ade80; --bad:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:24px; line-height:1.4;
+  }
+  h1{margin:0 0 4px; font-size:22px}
+  .lead{color:var(--text-dim); margin:0 0 28px; font-size:14px}
+  h2{font-size:16px; margin:0 0 4px}
+  .desc{color:var(--text-dim); font-size:13px; margin:0 0 14px}
+
+  .variant{
+    margin-bottom:36px; padding:20px;
+    background:#0d0d0d; border:1px solid var(--border); border-radius:14px;
+  }
+  .label{
+    display:inline-block; font-size:11px; letter-spacing:.6px;
+    text-transform:uppercase; color:var(--accent);
+    background:rgba(255,216,77,.1); padding:3px 10px; border-radius:999px;
+    margin-bottom:10px; font-weight:700;
+  }
+  .demo-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:14px;
+    max-width:720px;
+  }
+  @media (max-width:640px){ .demo-grid{grid-template-columns:1fr} }
+
+  /* ---------- gemeinsame Card-Basis ---------- */
+  .card{
+    background:var(--surface); padding:14px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .card-head{display:flex; justify-content:space-between; align-items:center}
+  .card-name{font-weight:600; font-size:15px}
+  .card-total{font-weight:700; font-size:15px}
+  .slots{display:grid; grid-template-columns:repeat(3,1fr); gap:6px}
+  .slot{
+    min-height:84px; padding:10px 6px;
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    gap:4px; font-size:11px; color:var(--text-dim); text-align:center;
+  }
+  .slot .emoji{font-size:24px}
+  .slot .name{font-weight:600; font-size:12px; color:var(--text)}
+  .slot .price{font-weight:700; font-size:12px; color:var(--text)}
+  .slot.empty .meins{font-size:12px; font-weight:700; color:var(--text); letter-spacing:.5px}
+  .slot.empty .plus{font-size:18px; color:var(--text-dim)}
+
+  /* ---------- VARIANTE 1 — AKTUELL (Referenz) ---------- */
+  .v1 .card{ border:1px solid var(--border); border-radius:10px }
+  .v1 .slot{ border:1px dashed var(--border-strong); border-radius:10px }
+  .v1 .slot.filled{ background:var(--surface-2); border:1px solid var(--border) }
+
+  /* ---------- VARIANTE 2 — SOFT (große runde Ecken) ---------- */
+  .v2 .card{ border:1px solid var(--border); border-radius:22px }
+  .v2 .slot{ border:1px dashed var(--border-strong); border-radius:18px }
+  .v2 .slot.filled{ background:var(--surface-2); border:1px solid var(--border); border-radius:18px }
+
+  /* ---------- VARIANTE 3 — KANTIG (eckig, scharf) ---------- */
+  .v3 .card{ border:1px solid var(--border); border-radius:0 }
+  .v3 .slot{ border:1px dashed var(--border-strong); border-radius:0 }
+  .v3 .slot.filled{ background:var(--surface-2); border:1px solid var(--border); border-radius:0 }
+  .v3 .slot.filled{ border-left:3px solid var(--accent) }
+
+  /* ---------- VARIANTE 4 — TICKET (geknickte Ecken) ---------- */
+  .v4 .card{
+    border:1px solid var(--border); border-radius:14px;
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  }
+  .v4 .slot{
+    border:1px dashed var(--border-strong);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  .v4 .slot.filled{
+    background:var(--surface-2); border:1px solid var(--border);
+  }
+
+  /* ---------- VARIANTE 5 — GLOW / NEON (Akzent-Schimmer) ---------- */
+  .v5 .card{
+    border:1px solid var(--border); border-radius:14px;
+    background:linear-gradient(180deg, #181818 0%, #111 100%);
+    box-shadow:0 0 0 1px rgba(255,216,77,.04), 0 8px 24px rgba(0,0,0,.5);
+  }
+  .v5 .slot{
+    border:1px dashed rgba(255,216,77,.35); border-radius:12px;
+    background:rgba(255,216,77,.02);
+  }
+  .v5 .slot.filled{
+    background:rgba(74,222,128,.06);
+    border:1px solid rgba(74,222,128,.35);
+    box-shadow:0 0 12px rgba(74,222,128,.12) inset;
+  }
+  .v5 .slot.empty .meins{color:var(--accent); text-shadow:0 0 8px rgba(255,216,77,.4)}
+
+  /* ---------- VARIANTE 6 — HEX/CHIP (sechseckige Slots) ---------- */
+  .v6 .card{ border:1px solid var(--border); border-radius:16px }
+  .v6 .slots{ gap:10px }
+  .v6 .slot{
+    border:1px dashed var(--border-strong);
+    clip-path: polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);
+    min-height:100px;
+  }
+  .v6 .slot.filled{
+    background:var(--surface-2); border:1px solid var(--border);
+  }
+
+  /* ---------- VARIANTE 7 — BOARDING-PASS (gestapelte Streifen) ---------- */
+  .v7 .card{ border:1px solid var(--border); border-radius:12px; padding:0; overflow:hidden }
+  .v7 .card-head{ padding:12px 14px; background:linear-gradient(90deg, #1c1c1c, #141414); border-bottom:1px dashed var(--border-strong)}
+  .v7 .slots{ padding:14px; gap:0; grid-template-columns:1fr }
+  .v7 .slot{
+    border:0; border-bottom:1px dashed var(--border-strong);
+    flex-direction:row; justify-content:flex-start; gap:12px; min-height:54px;
+    text-align:left; padding:8px 6px;
+  }
+  .v7 .slot:last-child{border-bottom:0}
+  .v7 .slot .emoji{font-size:22px}
+  .v7 .slot .meta{display:flex; flex-direction:column; gap:2px}
+
+  .footnote{color:var(--text-dim); font-size:12px; margin-top:6px}
+</style>
+</head>
+<body>
+
+<h1>🎨 MEINS! — Design-Vorschau für die Boxen</h1>
+<p class="lead">Sechs Varianten der Spieler-Karten und Slot-Felder im Spielmodus. Klick / Tap macht hier nichts — rein visuell.</p>
+
+<!-- VARIANTE 1 -->
+<section class="variant v1">
+  <span class="label">Variante 1 · Aktuell (Referenz)</span>
+  <h2>Klassisch — leicht gerundet, gestrichelte leere Slots</h2>
+  <p class="desc">So sieht das Spiel heute aus: 10 px Radius, dezente Rahmen, gepunktete leere Slots.</p>
+  <div class="demo-grid">
+    <div class="card">
+      <div class="card-head"><div class="card-name">👑 Anna</div><div class="card-total">285.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏁</div><div class="name">Porsche 911</div><div class="price">120.000 €</div></div>
+        <div class="slot filled"><div class="emoji">🚙</div><div class="name">BMW M3</div><div class="price">95.000 €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-name">Ben</div><div class="card-total">70.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏎️</div><div class="name">Audi RS6</div><div class="price">70.000 €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VARIANTE 2 -->
+<section class="variant v2">
+  <span class="label">Variante 2 · Soft</span>
+  <h2>Weich &amp; rund — große Radien, freundlich</h2>
+  <p class="desc">Pillen-Optik mit 18–22 px Radius. Wirkt verspielter, mobile-freundlich.</p>
+  <div class="demo-grid">
+    <div class="card">
+      <div class="card-head"><div class="card-name">👑 Anna</div><div class="card-total">285.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏁</div><div class="name">Porsche 911</div><div class="price">120.000 €</div></div>
+        <div class="slot filled"><div class="emoji">🚙</div><div class="name">BMW M3</div><div class="price">95.000 €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-name">Ben</div><div class="card-total">70.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏎️</div><div class="name">Audi RS6</div><div class="price">70.000 €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VARIANTE 3 -->
+<section class="variant v3">
+  <span class="label">Variante 3 · Kantig</span>
+  <h2>Hart &amp; technisch — scharfe Ecken, Akzent-Streifen links</h2>
+  <p class="desc">0 px Radius, gefüllte Slots bekommen einen 3 px Akzent-Streifen — wirkt wie ein Dashboard.</p>
+  <div class="demo-grid">
+    <div class="card">
+      <div class="card-head"><div class="card-name">👑 Anna</div><div class="card-total">285.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏁</div><div class="name">Porsche 911</div><div class="price">120.000 €</div></div>
+        <div class="slot filled"><div class="emoji">🚙</div><div class="name">BMW M3</div><div class="price">95.000 €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-name">Ben</div><div class="card-total">70.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏎️</div><div class="name">Audi RS6</div><div class="price">70.000 €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VARIANTE 4 -->
+<section class="variant v4">
+  <span class="label">Variante 4 · Ticket</span>
+  <h2>Geknickte Ecken — wie Tickets</h2>
+  <p class="desc">Diagonal abgeschnittene Ecken oben-links und unten-rechts. Spielerisch, einzigartig.</p>
+  <div class="demo-grid">
+    <div class="card">
+      <div class="card-head"><div class="card-name">👑 Anna</div><div class="card-total">285.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏁</div><div class="name">Porsche 911</div><div class="price">120.000 €</div></div>
+        <div class="slot filled"><div class="emoji">🚙</div><div class="name">BMW M3</div><div class="price">95.000 €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-name">Ben</div><div class="card-total">70.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏎️</div><div class="name">Audi RS6</div><div class="price">70.000 €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VARIANTE 5 -->
+<section class="variant v5">
+  <span class="label">Variante 5 · Glow / Neon</span>
+  <h2>Leuchtend — Akzent-Schimmer, Status-Farben</h2>
+  <p class="desc">Leere Slots schimmern gelb (Akzent), gefüllte grün (good). Premium-Optik, ähnlich Gaming-UI.</p>
+  <div class="demo-grid">
+    <div class="card">
+      <div class="card-head"><div class="card-name">👑 Anna</div><div class="card-total">285.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏁</div><div class="name">Porsche 911</div><div class="price">120.000 €</div></div>
+        <div class="slot filled"><div class="emoji">🚙</div><div class="name">BMW M3</div><div class="price">95.000 €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-name">Ben</div><div class="card-total">70.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏎️</div><div class="name">Audi RS6</div><div class="price">70.000 €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VARIANTE 6 -->
+<section class="variant v6">
+  <span class="label">Variante 6 · Hex / Chip</span>
+  <h2>Sechseckige Slots — Wabenmuster</h2>
+  <p class="desc">Auto-Slots sind Sechsecke. Sehr distinkt, aber Vorsicht: bei vielen Slots eng.</p>
+  <div class="demo-grid">
+    <div class="card">
+      <div class="card-head"><div class="card-name">👑 Anna</div><div class="card-total">285.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏁</div><div class="name">Porsche</div><div class="price">120k €</div></div>
+        <div class="slot filled"><div class="emoji">🚙</div><div class="name">BMW M3</div><div class="price">95k €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-name">Ben</div><div class="card-total">70.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏎️</div><div class="name">Audi RS6</div><div class="price">70k €</div></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+        <div class="slot empty"><span class="meins">MEINS!</span><span class="plus">+</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VARIANTE 7 -->
+<section class="variant v7">
+  <span class="label">Variante 7 · Listen-Style</span>
+  <h2>Boarding-Pass — Slots als Zeilen mit Trennstrich</h2>
+  <p class="desc">Slots untereinander statt nebeneinander. Mehr Platz für lange Autonamen, weniger „Karten-Optik".</p>
+  <div class="demo-grid">
+    <div class="card">
+      <div class="card-head"><div class="card-name">👑 Anna</div><div class="card-total">285.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏁</div><div class="meta"><div class="name">Porsche 911 GT3</div><div class="price">120.000 €</div></div></div>
+        <div class="slot filled"><div class="emoji">🚙</div><div class="meta"><div class="name">BMW M3 Competition</div><div class="price">95.000 €</div></div></div>
+        <div class="slot empty"><div class="emoji">＋</div><div class="meta"><div class="name">MEINS! — Slot frei</div></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-name">Ben</div><div class="card-total">70.000 €</div></div>
+      <div class="slots">
+        <div class="slot filled"><div class="emoji">🏎️</div><div class="meta"><div class="name">Audi RS6 Avant</div><div class="price">70.000 €</div></div></div>
+        <div class="slot empty"><div class="emoji">＋</div><div class="meta"><div class="name">MEINS! — Slot frei</div></div></div>
+        <div class="slot empty"><div class="emoji">＋</div><div class="meta"><div class="name">MEINS! — Slot frei</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<p class="footnote">💡 Wenn dir eine Variante (oder Kombination) gefällt, sag mir die Nummer — z. B. „Variante 2 mit Akzent-Streifen aus 3". Ich baue es dann sauber in <code>styles.css</code> ein.</p>
+
+</body>
+</html>

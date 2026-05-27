@@ -276,15 +276,20 @@ main {
 
 .players-grid { display: flex; flex-direction: column; gap: 10px; }
 .player-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 14px;
+  background: linear-gradient(180deg, #181818 0%, #111 100%);
+  border: 1px solid var(--border);
+  border-radius: 22px; padding: 14px;
   display: flex; flex-direction: column; gap: 10px;
-  transition: border-color .15s;
+  transition: border-color .15s, box-shadow .15s;
   min-width: 0;
   overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255,216,77,.04), 0 8px 24px rgba(0,0,0,.5);
 }
 .player-card.you { border-color: var(--text); }
-.player-card.complete { border-color: var(--good); }
+.player-card.complete {
+  border-color: var(--good);
+  box-shadow: 0 0 0 1px rgba(74,222,128,.18), 0 8px 24px rgba(0,0,0,.5);
+}
 .player-card-head {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
@@ -305,20 +310,27 @@ main {
 }
 .slot {
   position: relative;
-  background: transparent; border: 1px dashed var(--border-strong);
-  border-radius: var(--radius); padding: 10px 6px;
+  background: rgba(255,216,77,.02);
+  border: 1px dashed rgba(255,216,77,.35);
+  border-radius: 18px; padding: 10px 6px;
   text-align: center; min-height: 84px;
   display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px;
   cursor: pointer;
-  transition: border-color .15s, background .15s;
+  transition: border-color .15s, background .15s, box-shadow .15s;
   font-size: 11px; color: var(--text-dim);
   min-width: 0;
   overflow: hidden;
 }
-.slot:hover:not(.locked):not(.filled):not(.cooldown) { border-color: var(--text); background: var(--surface-2); }
+.slot:hover:not(.locked):not(.filled):not(.cooldown) {
+  border-color: var(--accent);
+  background: rgba(255,216,77,.06);
+  box-shadow: 0 0 12px rgba(255,216,77,.15) inset;
+}
 .slot.filled {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: rgba(74,222,128,.06);
+  border: 1px solid rgba(74,222,128,.35);
+  border-radius: 18px;
+  box-shadow: 0 0 12px rgba(74,222,128,.12) inset;
   cursor: default;
 }
 .slot.locked { opacity: .4; cursor: not-allowed; border-style: solid; }
@@ -329,8 +341,8 @@ main {
   color: var(--text);
   font-size: 12px;
 }
-.slot .slot-meins { font-size: 12px; font-weight: 700; color: var(--text); letter-spacing: .5px; }
-.slot .slot-plus { font-size: 18px; color: var(--text-dim); }
+.slot .slot-meins { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .5px; text-shadow: 0 0 8px rgba(255,216,77,.4); }
+.slot .slot-plus { font-size: 18px; color: var(--accent); opacity: .75; }
 .slot .slot-delete {
   position: absolute; top: 4px; right: 4px;
   width: 20px; height: 20px; border-radius: 50%;
