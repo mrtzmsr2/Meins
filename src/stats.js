@@ -1,6 +1,64 @@
 // MEINS! — Stats für die Trophäen-Seite (rein abgeleitet aus collection).
 import * as collection from './collection.js';
 
+/** XP pro Auto: 1 XP je angefangene 10.000 €. */
+export function xpForCar(price) {
+  return Math.floor(Math.max(0, Number(price) || 0) / 10000);
+}
+
+/** Level-Schwellen (kumulative XP). Index = Level-1. */
+const LEVEL_THRESHOLDS = [0, 50, 150, 300, 500, 750, 1100, 1500, 2000, 2700, 3600];
+const LEVEL_TITLES = [
+  'Auto-Frischling',     // L1
+  'Sammler',             // L2
+  'Sp\u00fcrnase',       // L3
+  'Profi-Sichter',       // L4
+  'Auto-Connaisseur',    // L5
+  'Garagen-Boss',        // L6
+  'Gro\u00dfsammler',    // L7
+  'Meistersammler',      // L8
+  'PS-Legende',          // L9
+  'Auto-Mogul',          // L10
+  'Highway-Halbgott',    // L11
+];
+
+export function computeLevel(totalXp) {
+  let level = 1;
+  for (let i = 1; i < LEVEL_THRESHOLDS.length; i++) {
+    if (totalXp >= LEVEL_THRESHOLDS[i]) level = i + 1;
+  }
+  const cur = LEVEL_THRESHOLDS[level - 1] || 0;
+  const next = LEVEL_THRESHOLDS[level] || null;
+  const title = LEVEL_TITLES[level - 1] || LEVEL_TITLES[LEVEL_TITLES.length - 1];
+  return {
+    level,
+    title,
+    totalXp,
+    currentLevelXp: cur,
+    nextLevelXp: next,
+    xpIntoLevel: totalXp - cur,
+    xpForNextLevel: next ? next - cur : 0,
+    progress: next ? (totalXp - cur) / (next - cur) : 1,
+    isMax: next == null,
+  };
+}
+
+/** Marken-Rang basierend auf Anzahl gesammelter Autos einer Marke. */
+const BRAND_RANK_THRESHOLDS = [
+  { count: 1,  label: 'Lehrling' },
+  { count: 3,  label: 'Geselle' },
+  { count: 7,  label: 'Meister' },
+  { count: 15, label: 'Gro\u00dfmeister' },
+];
+export function brandRankFor(count) {
+  let cur = null;
+  for (const t of BRAND_RANK_THRESHOLDS) {
+    if (count >= t.count) cur = t;
+  }
+  if (!cur) return null;
+  return cur.label;
+}
+
 export function computeStats() {
   const items = collection.getAll();
   const totalCount = items.length;
@@ -68,6 +126,16 @@ export function computeStats() {
   achievements.push({ id: 'streak3', label: '3 Tage in Folge', icon: '🔥', done: streak >= 3 });
   achievements.push({ id: 'streak7', label: '7 Tage in Folge', icon: '🚀', done: streak >= 7 });
 
+  // Level: XP aus allen gesammelten Autos.
+  const totalXp = items.reduce((n, it) => n + xpForCar(it.price), 0);
+  const levelInfo = computeLevel(totalXp);
+
+  // Marken-Raenge: pro Marke die Anzahl + (falls erreicht) Rang.
+  const brandRanks = Array.from(brands.values())
+    .map(b => ({ brand: b.brand, count: b.count, value: b.value, rank: brandRankFor(b.count) }))
+    .filter(b => b.rank)
+    .sort((a, b) => b.count - a.count || b.value - a.value);
+
   return {
     totalCount,
     totalValue,
@@ -77,6 +145,9 @@ export function computeStats() {
     richestDay,
     streak,
     achievements,
+    totalXp,
+    levelInfo,
+    brandRanks,
   };
 }
 

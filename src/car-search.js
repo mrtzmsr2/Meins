@@ -2,7 +2,8 @@
 import { CARS, MIN_CAR_PRICE } from './data/cars.js';
 import { store } from './store.js';
 import { fmtEUR, escapeHtml, norm } from './util.js';
-import { brandBadgeHTML } from './brands.js';
+import { brandBadgeHTML, brandNames } from './brands.js';
+import { THEME_TIERS, clampTheme, THEME_LABELS } from './game.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -47,13 +48,18 @@ function fuzzyTokenMatch(token, hayWords) {
   return false;
 }
 
-function search(q) {
+function search(q, themeFilter = 'all') {
   const nq = norm(q);
   if (!nq) return [];
   const tokens = nq.split(' ').filter(Boolean);
   const all = allCars();
+  const tiers = THEME_TIERS[themeFilter] || null;
   const scored = [];
   for (const c of all) {
+    // Theme-Filter: kuratierte Autos muessen zum Tier passen.
+    // Custom-Eintraege (kein tier) bleiben immer sichtbar.
+    if (tiers && c.tier && !tiers.has(c.tier)) continue;
+    if (tiers && !c.tier && !c.custom) continue;
     const hay = norm(`${c.brand} ${c.model}`);
     const hayWords = hay.split(' ').filter(Boolean);
     const exact = tokens.every(t => hay.includes(t));
@@ -86,18 +92,24 @@ function search(q) {
 /**
  * Open the car search modal.
  * @param {string} title  e.g. "Auto für Moritz eintragen"
+ * @param {{themeFilter?: string}} [opts]
  * @returns {Promise<{brand,model,price,emoji}|null>}
  */
-export function openCarSearch(title) {
+export function openCarSearch(title, opts = {}) {
+  const themeFilter = clampTheme(opts.themeFilter || 'all');
   return new Promise((resolve) => {
     const root = $('#modal-root');
     root.hidden = false;
     root.innerHTML = '';
     const backdrop = document.createElement('div'); backdrop.className = 'modal-backdrop';
     const modal = document.createElement('div'); modal.className = 'modal';
+    const themeBadge = themeFilter !== 'all'
+      ? `<div class="car-search-theme">Themen-Spiel: <strong>${escapeHtml(THEME_LABELS[themeFilter] || themeFilter)}</strong></div>`
+      : '';
     modal.innerHTML = `
       <button class="icon-btn modal-close" aria-label="Schließen">✕</button>
       <h2>${escapeHtml(title)}</h2>
+      ${themeBadge}
       <div class="car-search">
         <input class="text-input" id="cs-q" type="text" placeholder="Marke + Modell (z. B. „BMW M3“)" autocomplete="off" autofocus />
         <div class="search-results" id="cs-results"></div>
@@ -162,10 +174,10 @@ export function openCarSearch(title) {
       });
     }
 
-    q.addEventListener('input', () => renderResults(search(q.value)));
+    q.addEventListener('input', () => renderResults(search(q.value, themeFilter)));
     q.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        const list = search(q.value);
+        const list = search(q.value, themeFilter);
         if (list[0]) {
           const c = list[0];
           close({ brand: c.brand, model: c.model, price: Number(c.price) || 0, emoji: c.emoji || '🚗', custom: !!c.custom });

@@ -127,6 +127,20 @@ export function brandStyle(brand) {
   return STYLES[brand] || FALLBACK;
 }
 
+/** Alle bekannten Marken (alphabetisch). */
+export function brandNames() {
+  return Object.keys(STYLES).sort((a, b) => a.localeCompare(b, 'de'));
+}
+
+/** Popul\u00e4re Marken fuer die Marken-Wette (kuratierte Auswahl). */
+export const POPULAR_BRANDS_FOR_BET = [
+  'BMW', 'Mercedes-Benz', 'Mercedes-AMG', 'Audi', 'Porsche', 'Volkswagen',
+  'Ferrari', 'Lamborghini', 'McLaren', 'Aston Martin', 'Bentley',
+  'Rolls-Royce', 'Maserati', 'Bugatti', 'Tesla', 'Land Rover',
+  'Jaguar', 'Alfa Romeo', 'Lotus', 'Ford', 'Cadillac', 'Lexus',
+  'Volvo', 'Skoda', 'Cupra',
+];
+
 /** Render-Markup fuer ein Marken-Badge. Groesse via CSS-Klasse "logo-badge" + Modifier. */
 export function brandBadgeHTML(brand, size = 'md', extraClass = '') {
   const s = brandStyle(brand);

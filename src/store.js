@@ -4,7 +4,7 @@ const KEY = 'meins.v4.store';
 const defaults = () => ({
   lastGroup: null,           // { mode: 'single'|'multi', players: [{name, avatar?}] }
   customCars: [],            // user-added cars added via manual entry
-  settings: { name: '', slotCount: 3, cooldownSec: 30 },
+  settings: { name: '', slotCount: 3, cooldownSec: 30, themeFilter: 'all', betEnabled: false },
   savedGame: null,           // persistierter Single-Device-Spielstand
   groups: [],                // benannte gespeicherte Gruppen [{id,name,players:[{name,avatar}],createdAt}]
 });

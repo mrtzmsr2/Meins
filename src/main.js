@@ -4,12 +4,14 @@ import { store } from './store.js';
 import { createHost, joinHost, makeRoomCode } from './multiplayer.js';
 import {
   newGame, newGameFromPlayers, setSlot, clearSlot, ranking, progress, totalForPlayer,
+  bonusForPlayer, effectiveTotalForPlayer,
   isInCooldown, cooldownRemainingMs, nextCooldownSec,
-  clampSlotCount, clampCooldownSec,
+  clampSlotCount, clampCooldownSec, clampTheme,
   MIN_SLOT_COUNT, MAX_SLOT_COUNT, MIN_COOLDOWN_SEC, MAX_COOLDOWN_SEC,
+  THEMES, THEME_LABELS,
 } from './game.js';
 import { openCarSearch } from './car-search.js';
-import { brandBadgeHTML } from './brands.js';
+import { brandBadgeHTML, brandStyle, POPULAR_BRANDS_FOR_BET } from './brands.js';
 import { CARS } from './data/cars.js';
 import { sounds, haptic } from './sounds.js';
 import { AVATAR_POOL, nextAvatar, avatarHTML } from './avatars.js';
@@ -69,6 +71,12 @@ function renderSettingsBlock(host) {
   const s = store.getSettings();
   let slotCount = clampSlotCount(s.slotCount ?? 3);
   let cooldownSec = clampCooldownSec(s.cooldownSec ?? 30);
+  let themeFilter = clampTheme(s.themeFilter ?? 'all');
+  let betEnabled = !!s.betEnabled;
+
+  const themeOpts = THEMES.map(t =>
+    `<option value="${t}" ${t === themeFilter ? 'selected' : ''}>${escapeHtml(THEME_LABELS[t])}</option>`
+  ).join('');
 
   host.innerHTML = `
     <div class="settings-title">Spiel-Einstellungen</div>
@@ -94,12 +102,28 @@ function renderSettingsBlock(host) {
       <input type="range" id="set-cool-range" class="slider"
              min="${MIN_COOLDOWN_SEC}" max="${MAX_COOLDOWN_SEC}" step="5" value="${cooldownSec}" />
     </div>
+    <div class="settings-row settings-row--select">
+      <div>
+        <label for="set-theme">🏁 Themen-Spiel</label>
+        <span class="hint">Schränkt die Auto-Suche auf eine Kategorie ein</span>
+      </div>
+      <select id="set-theme" class="text-input theme-select">${themeOpts}</select>
+    </div>
+    <label class="settings-row settings-toggle">
+      <div>
+        <span class="settings-toggle-label">🎯 Marken-Wette</span>
+        <span class="hint">Jeder Spieler wählt vor Start eine Marke. Treffer = <strong>+50% Bonus</strong> auf den Auto-Preis (nur Einzelgerät)</span>
+      </div>
+      <input type="checkbox" id="set-bet" class="toggle-input" ${betEnabled ? 'checked' : ''} />
+    </label>
   `;
 
   const slotVal = $('#set-slot-val', host);
   const slotRange = $('#set-slot-range', host);
   const coolVal = $('#set-cool-val', host);
   const coolRange = $('#set-cool-range', host);
+  const themeSel = $('#set-theme', host);
+  const betChk = $('#set-bet', host);
 
   slotRange.addEventListener('input', () => {
     slotCount = clampSlotCount(slotRange.value);
@@ -111,8 +135,85 @@ function renderSettingsBlock(host) {
     coolVal.textContent = `${cooldownSec}s`;
     store.setSettings({ cooldownSec });
   });
+  themeSel.addEventListener('change', () => {
+    themeFilter = clampTheme(themeSel.value);
+    store.setSettings({ themeFilter });
+  });
+  betChk.addEventListener('change', () => {
+    betEnabled = !!betChk.checked;
+    store.setSettings({ betEnabled });
+  });
 
-  return { get values() { return { slotCount, cooldownSec }; } };
+  return { get values() { return { slotCount, cooldownSec, themeFilter, betEnabled }; } };
+}
+
+/**
+ * Modal: Marken-Wette w\u00e4hlen.
+ * Spieler w\u00e4hlen je eine Marke. Resolve: { 0: 'BMW', 1: 'Porsche', ... } oder null bei Abbruch.
+ */
+function openBrandBetPicker(players) {
+  return new Promise((resolve) => {
+    const root = $('#modal-root');
+    root.hidden = false;
+    root.innerHTML = '';
+    const backdrop = document.createElement('div'); backdrop.className = 'modal-backdrop';
+    const modal = document.createElement('div'); modal.className = 'modal bet-picker-modal';
+    const brandOpts = POPULAR_BRANDS_FOR_BET.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+    const rows = players.map((p, i) => `
+      <div class="bet-picker-row" data-i="${i}">
+        <div class="bet-picker-player">
+          ${avatarHTML(p.avatar, 'sm')}
+          <span>${escapeHtml(p.name)}</span>
+        </div>
+        <select class="text-input bet-picker-select" data-i="${i}">
+          <option value="">\u2014 keine Wette \u2014</option>
+          ${brandOpts}
+        </select>
+        <div class="bet-picker-preview" data-prev="${i}"></div>
+      </div>
+    `).join('');
+    modal.innerHTML = `
+      <button class="icon-btn modal-close" aria-label="Schlie\u00dfen">\u2715</button>
+      <h2>\ud83c\udfaf Marken-Wette</h2>
+      <p class="bet-picker-hint">Jeder Spieler tippt eine Marke. Wer ein Auto dieser Marke f\u00e4ngt, bekommt <strong>+50% Bonus</strong> auf den Preis.</p>
+      <div class="bet-picker-rows">${rows}</div>
+      <div class="bet-picker-actions">
+        <button class="secondary" id="bet-skip" type="button">\u00dcberspringen</button>
+        <button class="primary" id="bet-go" type="button">Spiel starten</button>
+      </div>
+    `;
+    root.append(backdrop, modal);
+    const close = (val) => {
+      root.hidden = true; root.innerHTML = '';
+      document.removeEventListener('keydown', escHandler);
+      resolve(val);
+    };
+    const escHandler = (e) => { if (e.key === 'Escape') close(null); };
+    document.addEventListener('keydown', escHandler);
+    backdrop.addEventListener('click', () => close(null));
+    $('.modal-close', modal).addEventListener('click', () => close(null));
+
+    const updatePreview = (i, brand) => {
+      const prev = modal.querySelector(`[data-prev="${i}"]`);
+      if (!prev) return;
+      prev.innerHTML = brand ? brandBadgeHTML(brand, 'md') : '';
+    };
+    modal.querySelectorAll('.bet-picker-select').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const i = parseInt(sel.dataset.i, 10);
+        updatePreview(i, sel.value);
+      });
+    });
+    $('#bet-skip', modal).addEventListener('click', () => close({}));
+    $('#bet-go', modal).addEventListener('click', () => {
+      const bets = {};
+      modal.querySelectorAll('.bet-picker-select').forEach(sel => {
+        const i = parseInt(sel.dataset.i, 10);
+        if (sel.value) bets[i] = sel.value;
+      });
+      close(bets);
+    });
+  });
 }
 
 // ============================================================
@@ -148,6 +249,9 @@ function renderHome() {
           hostId: saved.hostId || null,
           slotCount: saved.slotCount,
           cooldownSec: saved.cooldownSec,
+          paused: !!saved.paused,
+          themeFilter: clampTheme(saved.themeFilter || 'all'),
+          bets: (saved.bets && typeof saved.bets === 'object') ? { ...saved.bets } : {},
         };
         gameStartedAt = saved.startedAt || Date.now();
         renderGame();
@@ -333,15 +437,45 @@ function startSingleGame(playersInput, opts = null) {
     if (!p.avatar) p.avatar = nextAvatar(arr.slice(0, i).map(q => q.avatar));
   });
   const settings = opts || store.getSettings();
-  game = newGame('single', arr, null, {
-    slotCount: settings.slotCount,
-    cooldownSec: settings.cooldownSec,
-  });
-  store.setLastGroup({ mode: 'single', players: arr.map(p => ({ name: p.name, avatar: p.avatar })) });
-  clearPersistedGame();
-  gameStartedAt = Date.now();
-  persistGame();
-  renderGame();
+  const startWithBets = (bets) => {
+    game = newGame('single', arr, null, {
+      slotCount: settings.slotCount,
+      cooldownSec: settings.cooldownSec,
+      themeFilter: settings.themeFilter,
+      bets: bets || {},
+    });
+    store.setLastGroup({ mode: 'single', players: arr.map(p => ({ name: p.name, avatar: p.avatar })) });
+    clearPersistedGame();
+    gameStartedAt = Date.now();
+    persistGame();
+    renderGame();
+  };
+  if (settings.betEnabled) {
+    openBrandBetPicker(arr).then(bets => {
+      if (bets === null) return; // abgebrochen -> zurück
+      // Spieler-IDs sind erst nach newGame bekannt, also übersetzen via Name-Reihenfolge.
+      // Wir bauen das Spiel und mappen Bets dann anhand der Index-Reihenfolge.
+      game = newGame('single', arr, null, {
+        slotCount: settings.slotCount,
+        cooldownSec: settings.cooldownSec,
+        themeFilter: settings.themeFilter,
+      });
+      // bets: { index: brand }  ->  { playerId: brand }
+      const mapped = {};
+      arr.forEach((_p, i) => {
+        const brand = bets[i];
+        if (brand) mapped[game.players[i].id] = brand;
+      });
+      game.bets = mapped;
+      store.setLastGroup({ mode: 'single', players: arr.map(p => ({ name: p.name, avatar: p.avatar })) });
+      clearPersistedGame();
+      gameStartedAt = Date.now();
+      persistGame();
+      renderGame();
+    });
+  } else {
+    startWithBets({});
+  }
 }
 
 function renderGame() {
@@ -528,7 +662,10 @@ function buildPlayerCard(player) {
   if (isYou) card.classList.add('you');
   if (player.slots.every(s => s != null)) card.classList.add('complete');
 
-  const total = totalForPlayer(player);
+  const baseTotal = totalForPlayer(player);
+  const bonus = game ? bonusForPlayer(game, player) : 0;
+  const total = baseTotal + bonus;
+  const bet = game?.bets?.[player.id] || null;
   const cooldownMs = cooldownRemainingMs(player);
   const streak = player.deleteStreak || 0;
   const streakHtml = (cooldownMs > 0 && streak > 1)
@@ -536,14 +673,24 @@ function buildPlayerCard(player) {
   const cooldownBadge = cooldownMs > 0
     ? `<span class="cooldown-badge" title="Cooldown nach Löschen">⏱ ${Math.ceil(cooldownMs / 1000)}s${streakHtml}</span>`
     : '';
+  const betBadge = bet
+    ? `<span class="bet-badge" title="Marken-Wette: ${escapeHtml(bet)}">${brandBadgeHTML(bet, 'sm', 'bet-badge-logo')}<span class="bet-badge-text">🎯 ${escapeHtml(bet)}</span></span>`
+    : '';
+  const bonusBadge = bonus > 0
+    ? `<div class="player-card-bonus" title="Marken-Wetten-Bonus">+${fmtEUR(bonus)} 🎯</div>`
+    : '';
 
   card.innerHTML = `
     <div class="player-card-head">
       <div class="player-card-name">
         ${avatarHTML(player.avatar, 'md')}${player.isHost ? '<span class="crown">👑</span>' : ''}<span class="player-card-name-text">${escapeHtml(player.name)}</span>${isYou ? ' <span style="color:var(--text-dim);font-size:12px;font-weight:500;">(du)</span>' : ''}${cooldownBadge}
       </div>
-      <div class="player-card-total">${fmtEUR(total)}</div>
+      <div class="player-card-totals">
+        ${bonusBadge}
+        <div class="player-card-total">${fmtEUR(total)}</div>
+      </div>
     </div>
+    ${betBadge ? `<div class="player-card-bet">${betBadge}</div>` : ''}
     <div class="slots-row" style="--slot-cols:${game.slotCount}"></div>
   `;
   const slotsRow = $('.slots-row', card);
@@ -608,7 +755,7 @@ function buildSlot(player, idx, car) {
     <div class="slot-plus">+</div>
   `;
   el.addEventListener('click', async () => {
-    const c = await openCarSearch(`Auto für ${player.name} eintragen`);
+    const c = await openCarSearch(`Auto für ${player.name} eintragen`, { themeFilter: game?.themeFilter || 'all' });
     if (!c) return;
     handleAddCar(player.id, idx, c);
   });
@@ -771,11 +918,16 @@ function renderSummary(state) {
     row.className = 'rank-row' + (i === 0 ? ' first' : '');
     const cars = p.slots.filter(Boolean).map(c => `${c.brand} ${c.model}`).join(' · ');
     const medal = ['🥇','🥈','🥉'][i] || `#${i + 1}`;
+    const bet = state.bets?.[p.id] || null;
+    const betLine = bet
+      ? `<div class="rank-bet">🎯 Wette: <strong>${escapeHtml(bet)}</strong>${p.bonus > 0 ? ` · Bonus +${fmtEUR(p.bonus)}` : ' · kein Treffer'}</div>`
+      : '';
     row.innerHTML = `
       <div class="rank-medal">${medal}</div>
       <div>
         <div class="rank-name">${avatarHTML(p.avatar, 'sm')} ${escapeHtml(p.name)}</div>
         <div class="rank-cars">${escapeHtml(cars)}</div>
+        ${betLine}
       </div>
       <div class="rank-total">${fmtEUR(p.total)}</div>
     `;
@@ -787,7 +939,7 @@ function renderSummary(state) {
       const players = game.players.map(p => ({ id: p.id, name: p.name, isHost: p.isHost }));
       const s = store.getSettings();
       game = newGameFromPlayers('multi', players, mp.host.peer.id, {
-        slotCount: s.slotCount, cooldownSec: s.cooldownSec,
+        slotCount: s.slotCount, cooldownSec: s.cooldownSec, themeFilter: s.themeFilter,
       });
       mp.host.broadcast({ type: 'state', state: gameToWire(game) });
       renderGame();
@@ -1058,6 +1210,47 @@ async function renderTrophies() {
       ${t.sub ? `<div class="tro-tile-sub">${escapeHtml(t.sub)}</div>` : ''}
     </div>
   `).join('');
+
+  // Level-Bar einfügen (zwischen Stats und Achievements)
+  const lvl = s.levelInfo;
+  const levelBar = document.createElement('div');
+  levelBar.className = 'tro-level';
+  const pct = Math.max(0, Math.min(100, Math.round(lvl.progress * 100)));
+  const nextLine = lvl.isMax
+    ? `Maximum erreicht — du bist Legende.`
+    : `Noch <strong>${lvl.xpForNextLevel - lvl.xpIntoLevel} XP</strong> bis Level ${lvl.level + 1}`;
+  levelBar.innerHTML = `
+    <div class="tro-level-head">
+      <div class="tro-level-badge">L${lvl.level}</div>
+      <div class="tro-level-info">
+        <div class="tro-level-title">${escapeHtml(lvl.title)}</div>
+        <div class="tro-level-xp">${lvl.totalXp} XP gesamt · ${nextLine}</div>
+      </div>
+    </div>
+    <div class="tro-level-track"><div class="tro-level-fill" style="width:${pct}%"></div></div>
+  `;
+  statsHost.after(levelBar);
+
+  // Marken-Ränge
+  if (s.brandRanks && s.brandRanks.length) {
+    const ranksSection = document.createElement('div');
+    ranksSection.className = 'tro-section tro-brand-ranks';
+    ranksSection.innerHTML = `
+      <h3>Marken-Ränge</h3>
+      <div class="tro-ranks-grid">
+        ${s.brandRanks.map(b => `
+          <div class="tro-rank-card">
+            ${brandBadgeHTML(b.brand, 'md')}
+            <div class="tro-rank-body">
+              <div class="tro-rank-title">${escapeHtml(b.brand)}-${escapeHtml(b.rank)}</div>
+              <div class="tro-rank-sub">${b.count} ${b.count === 1 ? 'Auto' : 'Autos'} · ${fmtEUR(b.value)}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    levelBar.after(ranksSection);
+  }
 
   const aHost = $('#tro-achievements');
   aHost.innerHTML = s.achievements.map(a => `
@@ -1472,7 +1665,7 @@ function allSlotsFilledFn() {
 function mpStartGame() {
   const s = store.getSettings();
   game = newGameFromPlayers('multi', mp.players, mp.host.peer.id, {
-    slotCount: s.slotCount, cooldownSec: s.cooldownSec,
+    slotCount: s.slotCount, cooldownSec: s.cooldownSec, themeFilter: s.themeFilter,
   });
   store.setLastGroup({ mode: 'multi', players: mp.players.map(p => ({ name: p.name })) });
   gameStartedAt = Date.now();
@@ -1546,6 +1739,8 @@ function gameToWire(g) {
     mode: g.mode, status: g.status, hostId: g.hostId,
     slotCount: g.slotCount, cooldownSec: g.cooldownSec,
     paused: !!g.paused,
+    themeFilter: g.themeFilter || 'all',
+    bets: g.bets || {},
     players: g.players.map(p => ({
       id: p.id, name: p.name, isHost: !!p.isHost,
       slots: p.slots.slice(), cooldownUntil: p.cooldownUntil || 0,
@@ -1559,6 +1754,8 @@ function wireToGame(w) {
     slotCount: clampSlotCount(w.slotCount),
     cooldownSec: clampCooldownSec(w.cooldownSec),
     paused: !!w.paused,
+    themeFilter: clampTheme(w.themeFilter || 'all'),
+    bets: (w.bets && typeof w.bets === 'object') ? { ...w.bets } : {},
     players: w.players.map(p => ({
       id: p.id, name: p.name, isHost: !!p.isHost,
       slots: p.slots.slice(), cooldownUntil: p.cooldownUntil || 0,

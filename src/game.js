@@ -8,6 +8,31 @@ export const MAX_SLOT_COUNT = 6;
 export const MIN_COOLDOWN_SEC = 0;
 export const MAX_COOLDOWN_SEC = 600;
 
+/** Theme-Filter fuer das "Themen-Spiel". */
+export const THEMES = ['all', 'suv', 'sport', 'luxury', 'ev', 'classic'];
+export const THEME_LABELS = {
+  all: 'Alle Autos',
+  suv: '🚙 Nur SUV',
+  sport: '🏎️ Sport & Super',
+  luxury: '👑 Luxus',
+  ev: '⚡ Elektro',
+  classic: '🏛️ Oldtimer',
+};
+/** Tier-Set pro Theme. Manuelle Eintraege bleiben immer erlaubt. */
+export const THEME_TIERS = {
+  all: null,
+  suv: new Set(['suv']),
+  sport: new Set(['sport', 'super', 'hyper']),
+  luxury: new Set(['luxury', 'premium']),
+  ev: new Set(['ev']),
+  classic: new Set(['classic']),
+};
+export function clampTheme(v) {
+  return THEMES.includes(v) ? v : 'all';
+}
+/** Bonus-Multiplikator fuer Marken-Wette: matching Auto-Preis * 0.5 zusaetzlich. */
+export const BET_BONUS_FACTOR = 0.5;
+
 /**
  * @typedef {{ brand: string, model: string, price: number, emoji?: string }} Car
  * @typedef {{ id: string, name: string, slots: (Car|null)[], isHost?: boolean, cooldownUntil?: number }} Player
@@ -36,6 +61,8 @@ export function clampCooldownSec(v) {
 export function newGame(mode, names, hostId = null, opts = {}) {
   const slotCount = clampSlotCount(opts.slotCount);
   const cooldownSec = clampCooldownSec(opts.cooldownSec);
+  const themeFilter = clampTheme(opts.themeFilter);
+  const bets = (opts.bets && typeof opts.bets === 'object') ? { ...opts.bets } : {};
   const players = names.map((entry, i) => {
     const isObj = entry && typeof entry === 'object';
     const name = String(isObj ? entry.name : entry).slice(0, 20).trim() || `Spieler ${i + 1}`;
@@ -49,13 +76,15 @@ export function newGame(mode, names, hostId = null, opts = {}) {
       cooldownUntil: 0,
     };
   });
-  return { mode, status: 'playing', players, hostId: hostId || null, slotCount, cooldownSec };
+  return { mode, status: 'playing', players, hostId: hostId || null, slotCount, cooldownSec, themeFilter, bets };
 }
 
 /** Build a state from existing player objects (e.g. multiplayer joiners). */
 export function newGameFromPlayers(mode, players, hostId, opts = {}) {
   const slotCount = clampSlotCount(opts.slotCount);
   const cooldownSec = clampCooldownSec(opts.cooldownSec);
+  const themeFilter = clampTheme(opts.themeFilter);
+  const bets = (opts.bets && typeof opts.bets === 'object') ? { ...opts.bets } : {};
   return {
     mode,
     status: 'playing',
@@ -68,6 +97,8 @@ export function newGameFromPlayers(mode, players, hostId, opts = {}) {
     hostId,
     slotCount,
     cooldownSec,
+    themeFilter,
+    bets,
   };
 }
 
@@ -124,9 +155,28 @@ export function totalForPlayer(p) {
   return p.slots.reduce((sum, s) => sum + (s ? Number(s.price) || 0 : 0), 0);
 }
 
+/** Marken-Wetten-Bonus: jeder Treffer auf die gewettete Marke gibt +50% Wert. */
+export function bonusForPlayer(state, p) {
+  const bet = state?.bets?.[p.id];
+  if (!bet) return 0;
+  let bonus = 0;
+  for (const s of p.slots) {
+    if (s && s.brand === bet) bonus += (Number(s.price) || 0) * BET_BONUS_FACTOR;
+  }
+  return bonus;
+}
+
+export function effectiveTotalForPlayer(state, p) {
+  return totalForPlayer(p) + bonusForPlayer(state, p);
+}
+
 export function ranking(state) {
   return [...state.players]
-    .map(p => ({ ...p, total: totalForPlayer(p) }))
+    .map(p => {
+      const base = totalForPlayer(p);
+      const bonus = bonusForPlayer(state, p);
+      return { ...p, total: base + bonus, baseTotal: base, bonus };
+    })
     .sort((a, b) => b.total - a.total);
 }
 

@@ -1600,3 +1600,133 @@ body {
 .cat-tier--classic { background: rgba(190,150,90,0.20); color: #e2c393; }
 
 .cat-empty { text-align: center; opacity: 0.6; padding: 30px 10px; font-style: italic; }
+
+/* ====================== ETAPPE 2 ====================== */
+/* Settings: theme select + toggle */
+.settings-row.settings-row--select { grid-template-columns: 1fr auto; }
+.theme-select {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); padding: 8px 10px; border-radius: var(--radius);
+  font-size: 14px; min-width: 150px; cursor: pointer;
+}
+.settings-toggle { cursor: pointer; }
+.settings-toggle-label { font-size: 14px; font-weight: 600; color: var(--text); }
+.toggle-input {
+  appearance: none; -webkit-appearance: none;
+  width: 42px; height: 24px; border-radius: 999px;
+  background: var(--border); position: relative; cursor: pointer;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.toggle-input::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--text); transition: transform .15s;
+}
+.toggle-input:checked { background: var(--accent); }
+.toggle-input:checked::after { transform: translateX(18px); background: #000; }
+
+/* Bet badge + bonus on player card */
+.player-card-bet {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-top: -4px;
+}
+.bet-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,216,77,0.08);
+  border: 1px solid rgba(255,216,77,0.3);
+  padding: 3px 8px 3px 4px; border-radius: 999px;
+  font-size: 11px; color: var(--accent); font-weight: 600;
+}
+.bet-badge-text { letter-spacing: .3px; }
+.player-card-totals {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+}
+.player-card-bonus {
+  font-size: 11px; color: var(--accent);
+  font-weight: 700; font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 8px rgba(255,216,77,0.4);
+}
+
+/* Car-search theme indicator */
+.car-search-theme {
+  display: inline-block; padding: 4px 10px; border-radius: 999px;
+  background: rgba(255,216,77,0.08); border: 1px solid rgba(255,216,77,0.3);
+  color: var(--accent); font-size: 12px; font-weight: 600;
+  margin: -4px 0 8px;
+}
+
+/* Brand-Bet-Picker modal */
+.bet-picker-modal h2 { margin-bottom: 4px; }
+.bet-picker-hint { font-size: 13px; color: var(--text-dim); margin: 0 0 14px; line-height: 1.45; }
+.bet-picker-rows {
+  display: flex; flex-direction: column; gap: 10px;
+  max-height: 60vh; overflow-y: auto;
+  margin: 0 -4px; padding: 4px;
+}
+.bet-picker-row {
+  display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 10px; align-items: center;
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 10px; border-radius: var(--radius);
+}
+.bet-picker-player { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.bet-picker-select { padding: 8px; font-size: 13px; }
+.bet-picker-preview { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+.bet-picker-actions {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px;
+}
+
+/* Summary rank-bet */
+.rank-bet {
+  font-size: 11px; color: var(--accent);
+  margin-top: 4px; font-weight: 500;
+}
+
+/* Trophies: level bar */
+.tro-level {
+  background: linear-gradient(135deg, rgba(255,216,77,0.06) 0%, rgba(255,216,77,0.02) 100%);
+  border: 1px solid rgba(255,216,77,0.25);
+  border-radius: var(--radius); padding: 16px;
+  display: flex; flex-direction: column; gap: 10px;
+  margin: 16px 0;
+}
+.tro-level-head { display: flex; align-items: center; gap: 14px; }
+.tro-level-badge {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--accent); color: #000;
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 18px;
+  box-shadow: 0 0 16px rgba(255,216,77,0.4);
+  flex-shrink: 0;
+}
+.tro-level-info { flex: 1; min-width: 0; }
+.tro-level-title { font-weight: 700; font-size: 16px; color: var(--text); }
+.tro-level-xp { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.tro-level-xp strong { color: var(--accent); }
+.tro-level-track {
+  height: 8px; background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px; overflow: hidden;
+}
+.tro-level-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, #ff9d00 100%);
+  box-shadow: 0 0 12px rgba(255,216,77,0.6);
+  transition: width .4s ease;
+}
+
+/* Trophies: brand-ranks */
+.tro-brand-ranks { margin-top: 18px; }
+.tro-brand-ranks h3 { margin: 0 0 10px; font-size: 16px; }
+.tro-ranks-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.tro-rank-card {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px;
+}
+.tro-rank-body { min-width: 0; flex: 1; }
+.tro-rank-title { font-weight: 700; font-size: 13px; color: var(--text); }
+.tro-rank-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
