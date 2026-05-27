@@ -350,6 +350,25 @@ function renderGame() {
   $('#game-leave').addEventListener('click', () => {
     (async () => { if (await customConfirm(CONFIRM.endGame)) renderHome(); })();
   });
+  // Pause-Button: nur Single oder Multi-Host darf pausieren
+  const pauseBtn = $('#game-pause');
+  if (pauseBtn) {
+    const canPause = game?.mode === 'single' || !!mp?.isHost;
+    if (!canPause) {
+      pauseBtn.hidden = true;
+    } else {
+      pauseBtn.addEventListener('click', () => {
+        if (!game) return;
+        game.paused = !game.paused;
+        try { haptic.medium(); } catch {}
+        if (mp?.isHost && mp.host) {
+          try { mp.host.broadcast({ type: 'state', state: gameToWire(game) }); } catch (e) { console.warn('broadcast pause failed', e); }
+        }
+        persistGame();
+        refreshGameView();
+      });
+    }
+  }
   // "Auswertung jetzt"-Button: nur Single-Mode oder Multi-Host darf vorzeitig auswerten
   const finishBtn = $('#game-finish');
   if (finishBtn) {
@@ -422,9 +441,24 @@ function refreshGameView() {
 
   $('#game-tip').textContent = game.status === 'done'
     ? 'Alle Slots voll — gleich kommt die Auswertung.'
-    : (game.mode === 'single'
-        ? 'Tippt einen Slot zum Eintragen. ✕ auf einem Auto zum Löschen (Cooldown!).'
-        : 'Ruft "Meins!" → tippt einen freien Slot bei dir. ✕ zum Löschen (Cooldown!).');
+    : (game.paused
+        ? (game.mode === 'single' || mp?.isHost
+            ? '⏸️ Pausiert — tippe ▶️ zum Fortsetzen.'
+            : '⏸️ Spiel pausiert — der Host setzt fort.')
+        : (game.mode === 'single'
+            ? 'Tippt einen Slot zum Eintragen. ✕ auf einem Auto zum Löschen (Cooldown!).'
+            : 'Ruft "Meins!" → tippt einen freien Slot bei dir. ✕ zum Löschen (Cooldown!).'));
+
+  // Pause-Overlay & Button-Zustand
+  const pauseBtn = $('#game-pause');
+  if (pauseBtn) {
+    pauseBtn.textContent = game.paused ? '▶️' : '⏸️';
+    pauseBtn.title = game.paused ? 'Spiel fortsetzen' : 'Spiel pausieren';
+    pauseBtn.setAttribute('aria-label', pauseBtn.title);
+    pauseBtn.classList.toggle('is-paused', !!game.paused);
+  }
+  const view = app.querySelector('.view-game');
+  if (view) view.classList.toggle('is-paused', !!game.paused);
 
   startCooldownTickIfNeeded();
 
@@ -583,6 +617,7 @@ function buildSlot(player, idx, car) {
 
 function canEditSlot(player) {
   if (!game) return false;
+  if (game.paused) return false;
   if (game.mode === 'single') return true;
   if (mp?.isHost) return mp.host.peer.id === player.id;
   return mp?.myId === player.id;
@@ -606,12 +641,14 @@ function handleAddCar(playerId, slotIdx, car) {
   haptic.medium();
   persistGame();
   refreshGameView();
-  // Konfetti & Toast aus dem gerade gefuellten Slot
+  // Konfetti & Toast aus dem gerade gefuellten Slot (Tier nach Preis)
+  const price = Number(car?.price) || 0;
+  const tier = price >= 500000 ? 'jackpot' : (price >= 200000 ? 'big' : 'normal');
   requestAnimationFrame(() => {
     const slotEl = document.querySelector(`.slot[data-key="${playerId}:${slotIdx}"]`);
-    if (slotEl) spawnConfetti(slotEl);
+    if (slotEl) spawnConfetti(slotEl, 14, tier);
   });
-  toast(TEXT.caught(), 1200);
+  toast(tier === 'jackpot' ? '💰 JACKPOT!' : (tier === 'big' ? '🔥 Teuer!' : TEXT.caught()), tier === 'jackpot' ? 2000 : 1200);
 
   // Optionales Beweis-Foto -> Sammlung (nur Single-Device)
   if (game.mode === 'single') {
@@ -1447,6 +1484,7 @@ function mpHandleHostMsg(peerId, msg) {
   if (!mp?.isHost) return;
   if (msg.type === 'addCar') {
     if (!game) return;
+    if (game.paused) { mp.host.sendTo(peerId, { type: 'denied', reason: 'paused' }); return; }
     if (peerId !== msg.playerId) return;
     const res = setSlot(game, msg.playerId, msg.slotIdx, msg.car);
     if (!res.ok && res.reason === 'cooldown') {
@@ -1458,6 +1496,7 @@ function mpHandleHostMsg(peerId, msg) {
   }
   if (msg.type === 'removeCar') {
     if (!game) return;
+    if (game.paused) { mp.host.sendTo(peerId, { type: 'denied', reason: 'paused' }); return; }
     if (peerId !== msg.playerId) return;
     const res = clearSlot(game, msg.playerId, msg.slotIdx);
     if (!res.ok) return;
@@ -1506,6 +1545,7 @@ function gameToWire(g) {
   return {
     mode: g.mode, status: g.status, hostId: g.hostId,
     slotCount: g.slotCount, cooldownSec: g.cooldownSec,
+    paused: !!g.paused,
     players: g.players.map(p => ({
       id: p.id, name: p.name, isHost: !!p.isHost,
       slots: p.slots.slice(), cooldownUntil: p.cooldownUntil || 0,
@@ -1518,6 +1558,7 @@ function wireToGame(w) {
     mode: w.mode, status: w.status, hostId: w.hostId,
     slotCount: clampSlotCount(w.slotCount),
     cooldownSec: clampCooldownSec(w.cooldownSec),
+    paused: !!w.paused,
     players: w.players.map(p => ({
       id: p.id, name: p.name, isHost: !!p.isHost,
       slots: p.slots.slice(), cooldownUntil: p.cooldownUntil || 0,

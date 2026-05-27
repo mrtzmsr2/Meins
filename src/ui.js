@@ -62,18 +62,33 @@ function escapeHtml(s) {
 /**
  * Konfetti-Burst aus einem Element heraus (z. B. der gerade gefüllte Slot).
  * Kurz, performant — pure DOM, kein Canvas.
+ * tier: 'normal' (Standard), 'big' (>=200k€), 'jackpot' (>=500k€)
  */
-export function spawnConfetti(targetEl, count = 14) {
+export function spawnConfetti(targetEl, count = 14, tier = 'normal') {
   if (!targetEl) return;
   const rect = targetEl.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
-  const palette = ['#ff4d4d', '#c81e1e', '#ffd24a', '#ffffff', '#1f1f1f'];
-  for (let i = 0; i < count; i++) {
+  let palette = ['#ff4d4d', '#c81e1e', '#ffd24a', '#ffffff', '#1f1f1f'];
+  let pieces = count;
+  let lifeMs = 900;
+  let spread = 1;
+  if (tier === 'big') {
+    pieces = 28;
+    spread = 1.4;
+    palette = ['#ffd84d', '#ffaf00', '#ffffff', '#ff4d4d', '#4ade80'];
+  } else if (tier === 'jackpot') {
+    pieces = 48;
+    spread = 1.9;
+    lifeMs = 1400;
+    palette = ['#ffd700', '#ffaf00', '#fff7c2', '#ffffff', '#ffd84d', '#b8860b'];
+  }
+  for (let i = 0; i < pieces; i++) {
     const p = document.createElement('span');
     p.className = 'confetti-piece';
-    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
-    const dist = 60 + Math.random() * 60;
+    if (tier === 'jackpot') p.classList.add('confetti-jackpot');
+    const angle = (Math.PI * 2 * i) / pieces + Math.random() * 0.4;
+    const dist = (60 + Math.random() * 80) * spread;
     const dx = Math.cos(angle) * dist;
     const dy = Math.sin(angle) * dist - 20;
     const rot = (Math.random() * 360) | 0;
@@ -84,7 +99,7 @@ export function spawnConfetti(targetEl, count = 14) {
     p.style.setProperty('--rot', `${rot}deg`);
     p.style.background = palette[i % palette.length];
     document.body.appendChild(p);
-    setTimeout(() => p.remove(), 900);
+    setTimeout(() => p.remove(), lifeMs);
   }
 }
 

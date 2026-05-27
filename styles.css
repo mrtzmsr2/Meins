@@ -1255,6 +1255,46 @@ body {
     opacity: 0;
   }
 }
+/* Jackpot-Konfetti — größer + Schimmer */
+.confetti-piece.confetti-jackpot {
+  width: 11px; height: 16px;
+  box-shadow: 0 0 8px currentColor, 0 0 14px rgba(255,215,0,.5);
+  animation-duration: 1.35s;
+}
+
+/* ============================================================
+   Pause-Overlay
+   ============================================================ */
+.view-game.is-paused .players-grid {
+  filter: blur(2px) saturate(.6);
+  pointer-events: none;
+  transition: filter .2s;
+}
+.view-game.is-paused::before {
+  content: "⏸  Spiel pausiert";
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--accent);
+  text-shadow: 0 0 24px rgba(255,216,77,.4), 0 4px 24px rgba(0,0,0,.8);
+  background: radial-gradient(circle at center, rgba(0,0,0,.55) 0%, rgba(0,0,0,.85) 70%);
+  z-index: 800;
+  pointer-events: none;
+  animation: pause-pulse 2s ease-in-out infinite;
+}
+@keyframes pause-pulse {
+  0%, 100% { opacity: .92; }
+  50% { opacity: 1; }
+}
+.icon-btn.is-paused {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 12px rgba(255,216,77,.3);
+}
 
 /* ============================================================
    Cooldown-Ring (im Slot)

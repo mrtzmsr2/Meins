@@ -11,6 +11,42 @@ function allCars() {
   return [...store.getCustomCars(), ...CARS];
 }
 
+/** Levenshtein-Distanz (Tippfehler-Toleranz). Iterativ, O(n*m). */
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const m = a.length, n = b.length;
+  let prev = new Array(n + 1);
+  let curr = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+}
+
+/** Fuzzy-Match: prüft ob token ungefähr in einem der Worte von hay vorkommt. */
+function fuzzyTokenMatch(token, hayWords) {
+  if (!token) return true;
+  // exakter Treffer (substring) zählt sowieso
+  for (const w of hayWords) if (w.includes(token)) return true;
+  // Tippfehler-Toleranz: erlaubte Distanz hängt von Token-Länge ab
+  const maxDist = token.length <= 3 ? 0 : (token.length <= 5 ? 1 : 2);
+  if (maxDist === 0) return false;
+  for (const w of hayWords) {
+    // Distanz nur sinnvoll bei ähnlich langen Worten
+    if (Math.abs(w.length - token.length) > maxDist) continue;
+    if (levenshtein(token, w) <= maxDist) return true;
+  }
+  return false;
+}
+
 function search(q) {
   const nq = norm(q);
   if (!nq) return [];
@@ -19,9 +55,15 @@ function search(q) {
   const scored = [];
   for (const c of all) {
     const hay = norm(`${c.brand} ${c.model}`);
-    if (!tokens.every(t => hay.includes(t))) continue;
-    // simple score: prefix-match on brand wins
-    let score = 0;
+    const hayWords = hay.split(' ').filter(Boolean);
+    const exact = tokens.every(t => hay.includes(t));
+    let fuzzy = false;
+    if (!exact) {
+      fuzzy = tokens.every(t => fuzzyTokenMatch(t, hayWords));
+      if (!fuzzy) continue;
+    }
+    // simple score: prefix-match on brand wins, exakte Treffer vor Fuzzy
+    let score = fuzzy ? 200 : 0;
     if (hay.startsWith(nq)) score += 50;
     if (norm(c.brand).startsWith(tokens[0])) score += 20;
     score += hay.length - nq.length; // prefer shorter matches
