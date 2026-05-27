@@ -144,7 +144,62 @@ export const POPULAR_BRANDS_FOR_BET = [
 /** Render-Markup fuer ein Marken-Badge. Groesse via CSS-Klasse "logo-badge" + Modifier. */
 export function brandBadgeHTML(brand, size = 'md', extraClass = '') {
   const s = brandStyle(brand);
-  const bgStyle = s.bgGrad ? `background:${s.bgGrad}` : `background:${s.bg}`;
-  const sizeClass = `logo-badge--${size}`;
-  return `<span class="logo-badge ${sizeClass} ${extraClass}" style="${bgStyle};color:${s.fg}" aria-hidden="true">${s.label}</span>`;
+  const shape = brandShape(brand);
+  const grad = s.bgGrad
+    ? s.bgGrad
+    : `linear-gradient(140deg, ${lighten(s.bg, 0.12)} 0%, ${s.bg} 55%, ${darken(s.bg, 0.18)} 100%)`;
+  const ringColor = s.accent && s.accent !== s.fg ? s.accent : 'rgba(255,255,255,0.18)';
+  const style = `background:${grad};color:${s.fg};--brand-ring:${ringColor}`;
+  // L\u00e4ngere Labels bekommen kleinere Buchstabengr\u00f6\u00dfe via data-attr
+  const labelLen = (s.label || '').length;
+  const lenClass = labelLen >= 4 ? 'logo-badge--long' : (labelLen === 3 ? 'logo-badge--mid' : '');
+  return `<span class="logo-badge logo-badge--${shape} logo-badge--${size} ${lenClass} ${extraClass}" style="${style}" aria-hidden="true"><span class="logo-badge-label">${s.label}</span></span>`;
+}
+
+/** Form-Kategorie pro Marke (CSS-Klasse). Default: 'round'. */
+const SHAPE_OVERRIDES = {
+  // Wappen / Schild (Sport-Heritage)
+  'Porsche': 'shield', 'Ferrari': 'shield', 'Lamborghini': 'shield',
+  'Alfa Romeo': 'shield', 'Maserati': 'shield', 'Pagani': 'shield',
+  'Koenigsegg': 'shield', 'Aston Martin': 'shield', 'Bugatti': 'shield',
+  'Lancia': 'shield', 'De Tomaso': 'shield', 'Iso': 'shield',
+  // Oval / langgestreckt
+  'Ford': 'oval', 'Volvo': 'oval', 'Hyundai': 'oval', 'Kia': 'oval',
+  'Genesis': 'oval', 'Bentley': 'oval', 'Rolls-Royce': 'oval',
+  'Lincoln': 'oval', 'Buick': 'oval', 'Cadillac': 'oval',
+  // Hexagonal / modern
+  'Tesla': 'hex', 'Polestar': 'hex', 'Rimac': 'hex', 'Lucid': 'hex',
+  'NIO': 'hex', 'Xiaomi': 'hex', 'BYD': 'hex', 'Zeekr': 'hex',
+  'Czinger': 'hex', 'Apollo': 'hex',
+};
+export function brandShape(brand) {
+  return SHAPE_OVERRIDES[brand] || 'round';
+}
+
+// --- kleine Farb-Helfer (lighten/darken auf hex/rgb) ---
+function clamp01(n) { return Math.max(0, Math.min(1, n)); }
+function parseHex(hex) {
+  const s = String(hex || '').replace('#', '');
+  if (s.length !== 6) return null;
+  const r = parseInt(s.slice(0, 2), 16);
+  const g = parseInt(s.slice(2, 4), 16);
+  const b = parseInt(s.slice(4, 6), 16);
+  if ([r, g, b].some(isNaN)) return null;
+  return { r, g, b };
+}
+function toHex({ r, g, b }) {
+  const h = (n) => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0');
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+function lighten(hex, amt) {
+  const c = parseHex(hex);
+  if (!c) return hex;
+  const a = clamp01(amt);
+  return toHex({ r: c.r + (255 - c.r) * a, g: c.g + (255 - c.g) * a, b: c.b + (255 - c.b) * a });
+}
+function darken(hex, amt) {
+  const c = parseHex(hex);
+  if (!c) return hex;
+  const a = clamp01(amt);
+  return toHex({ r: c.r * (1 - a), g: c.g * (1 - a), b: c.b * (1 - a) });
 }

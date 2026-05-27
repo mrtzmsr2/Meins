@@ -544,18 +544,64 @@ main {
 
 /* Marken-Badge (stilisiertes Logo) */
 .logo-badge {
+  position: relative;
   display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 800; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  letter-spacing: 0.5px; line-height: 1;
-  border-radius: 50%; aspect-ratio: 1/1;
+  font-weight: 800;
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.4px; line-height: 1;
   text-align: center;
-  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.10), 0 2px 6px rgba(0,0,0,0.4);
   flex-shrink: 0;
+  /* Default: rund */
+  border-radius: 50%; aspect-ratio: 1/1;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    inset 0 0 0 1px var(--brand-ring, rgba(255,255,255,0.12)),
+    0 2px 8px rgba(0,0,0,0.55);
+  overflow: hidden;
 }
+.logo-badge::after {
+  /* feiner Glanz oben */
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 18%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 55%);
+  pointer-events: none;
+}
+.logo-badge-label {
+  position: relative; z-index: 1;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+}
+.logo-badge--long .logo-badge-label { font-size: 0.78em; letter-spacing: 0.2px; }
+.logo-badge--mid  .logo-badge-label { font-size: 0.88em; }
+
+/* Form-Varianten */
+.logo-badge--round {} /* default */
+.logo-badge--shield {
+  /* Wappen: oben rund, unten zugespitzt */
+  aspect-ratio: 1/1.12;
+  border-radius: 28% 28% 42% 42% / 24% 24% 60% 60%;
+}
+.logo-badge--oval {
+  /* langgezogen */
+  aspect-ratio: 1.7/1;
+  border-radius: 999px;
+}
+.logo-badge--hex {
+  border-radius: 22%;
+  clip-path: polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 2px 8px rgba(0,0,0,0.55);
+}
+
 .logo-badge--sm { width: 30px; height: 30px; font-size: 10px; }
 .logo-badge--md { width: 40px; height: 40px; font-size: 12px; }
 .logo-badge--lg { width: 56px; height: 56px; font-size: 14px; }
 .logo-badge--xl { width: 72px; height: 72px; font-size: 18px; }
+/* Oval: Breite ist gr\u00f6\u00dfer als H\u00f6he - Height bleibt, Width \u00fcber aspect-ratio */
+.logo-badge--oval.logo-badge--sm { width: 44px; height: 26px; }
+.logo-badge--oval.logo-badge--md { width: 58px; height: 34px; }
+.logo-badge--oval.logo-badge--lg { width: 78px; height: 46px; }
+.logo-badge--oval.logo-badge--xl { width: 96px; height: 56px; }
 
 .slot-logo { display: flex; justify-content: center; margin-bottom: 6px; }
 
@@ -661,7 +707,12 @@ button:focus-visible, a:focus-visible {
 }
 :root[data-theme="light"] body { background: var(--bg); color: var(--text); }
 :root[data-theme="light"] .topbar { background: var(--bg); }
-:root[data-theme="light"] .logo-badge { box-shadow: inset 0 0 0 2px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.18); }
+:root[data-theme="light"] .logo-badge {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    inset 0 0 0 1px var(--brand-ring, rgba(0,0,0,0.08)),
+    0 1px 4px rgba(0,0,0,0.22);
+}
 :root[data-theme="light"] .toast {
   background: #1c1c1c; color: #fff;
 }

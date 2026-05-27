@@ -45,7 +45,31 @@ function resizeToDataUrl(img) {
   canvas.width = tw; canvas.height = th;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(img, 0, 0, tw, th);
+  drawWatermark(ctx, tw, th);
   return canvas.toDataURL('image/jpeg', QUALITY);
+}
+
+/** Ultra-dezenter Foto-Stempel: "MEINS · DD.MM.YY" unten rechts, kaum sichtbar. */
+function drawWatermark(ctx, w, h) {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const dateStr = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${String(d.getFullYear()).slice(-2)}`;
+  const text = `MEINS \u00b7 ${dateStr}`;
+  // Schriftgr\u00f6\u00dfe relativ zur Bildkante (ca. 1.6%)
+  const fontSize = Math.max(11, Math.round(Math.min(w, h) * 0.018));
+  ctx.save();
+  ctx.font = `500 ${fontSize}px ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif`;
+  ctx.textBaseline = 'bottom';
+  ctx.textAlign = 'right';
+  const margin = Math.round(fontSize * 0.9);
+  // Ganz feiner Schatten f\u00fcr Lesbarkeit auf hellen Hintergr\u00fcnden
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 2;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.fillText(text, w - margin, h - margin);
+  ctx.restore();
 }
 
 /**
