@@ -354,16 +354,17 @@ function renderGame() {
     const canFinish = game?.mode === 'single' || !!mp?.isHost;
     if (canFinish) {
       finishBtn.hidden = false;
-      finishBtn.addEventListener('click', () => {
-        (async () => {
-          if (!(await customConfirm(CONFIRM.finishEarly))) return;
-          if (!game) return;
-          game.status = 'done';
-          if (mp?.isHost) {
-            mp.host.broadcast({ type: 'state', state: gameToWire(game) });
-          }
-          refreshGameView();
-        })();
+      finishBtn.addEventListener('click', async () => {
+        if (!(await customConfirm(CONFIRM.finishEarly))) return;
+        if (!game) return;
+        game.status = 'done';
+        clearPersistedGame();
+        if (mp?.isHost && mp.host) {
+          try { mp.host.broadcast({ type: 'state', state: gameToWire(game) }); } catch (e) { console.warn('broadcast finish failed', e); }
+        }
+        try { sounds.win(); } catch {}
+        try { haptic.success(); } catch {}
+        renderSummary(game);
       });
     }
   }
