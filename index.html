@@ -60,6 +60,10 @@
           <li>Wenn alle 3 Slots voll sind, gewinnt die <strong>teuerste Sammlung</strong>.</li>
         </ol>
       </div>
+
+      <div class="home-footer">
+        <button type="button" class="ghost-link home-catalog-link" id="btn-catalog">📖 Fahrzeug-Lexikon</button>
+      </div>
     </section>
   </template>
 
@@ -240,6 +244,26 @@
         </div>
       </div>
     </div>
+  </template>
+
+  <!-- ============== CATALOG (Fahrzeug-Lexikon) ============== -->
+  <template id="tpl-catalog">
+    <section class="view view-catalog">
+      <button class="ghost-link" id="cat-back">← Zurück</button>
+      <div class="cat-head">
+        <h2 id="cat-title">📖 Fahrzeug-Lexikon</h2>
+        <div class="cat-stats" id="cat-stats"></div>
+      </div>
+      <div class="cat-toolbar">
+        <input class="text-input" id="cat-search" type="search" placeholder="🔎 Suche Marke oder Modell …" autocomplete="off" />
+        <div class="cat-tabs" role="tablist">
+          <button type="button" class="cat-tab active" data-tab="brands" role="tab" aria-selected="true">🏷️ Marken</button>
+          <button type="button" class="cat-tab" data-tab="all" role="tab" aria-selected="false">📋 Alle Modelle</button>
+        </div>
+      </div>
+      <div class="cat-crumbs" id="cat-crumbs" hidden></div>
+      <div class="cat-body" id="cat-body"></div>
+    </section>
   </template>
 
   <script type="module" src="./src/main.js"></script>

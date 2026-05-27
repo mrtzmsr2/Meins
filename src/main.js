@@ -10,6 +10,7 @@ import {
 } from './game.js';
 import { openCarSearch } from './car-search.js';
 import { brandBadgeHTML } from './brands.js';
+import { CARS } from './data/cars.js';
 import { sounds, haptic } from './sounds.js';
 import { AVATAR_POOL, nextAvatar, avatarHTML } from './avatars.js';
 import { theme, applyTheme } from './theme.js';
@@ -182,6 +183,7 @@ function renderHome() {
   collBtn?.addEventListener('click', renderCollection);
   $('#btn-trophies')?.addEventListener('click', renderTrophies);
   $('#btn-history')?.addEventListener('click', renderHistory);
+  $('#btn-catalog')?.addEventListener('click', renderCatalog);
 
   // Gespeicherte Gruppen
   const groups = store.getGroups();
@@ -1091,6 +1093,202 @@ async function renderHistory() {
       });
     host.appendChild(sec);
   });
+}
+
+// ============================================================
+// CATALOG (Fahrzeug-Lexikon — alle Marken & Modelle)
+// ============================================================
+function renderCatalog() {
+  cleanupSession();
+  app.innerHTML = '';
+  app.appendChild(tpl('tpl-catalog'));
+  $('#cat-back').addEventListener('click', renderHome);
+
+  const body = $('#cat-body');
+  const stats = $('#cat-stats');
+  const crumbs = $('#cat-crumbs');
+  const search = $('#cat-search');
+  const tabs = $$('.cat-tab');
+
+  // State
+  let activeTab = 'brands';
+  let selectedBrand = null;
+  let query = '';
+
+  // Marken-Daten aggregieren
+  const byBrand = new Map();
+  for (const c of CARS) {
+    if (!byBrand.has(c.brand)) byBrand.set(c.brand, []);
+    byBrand.get(c.brand).push(c);
+  }
+  for (const arr of byBrand.values()) arr.sort((a, b) => b.price - a.price);
+  const brands = Array.from(byBrand.entries())
+    .map(([name, cars]) => ({
+      name,
+      cars,
+      count: cars.length,
+      maxPrice: cars[0]?.price || 0,
+      avgPrice: Math.round(cars.reduce((s, c) => s + c.price, 0) / cars.length),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+
+  stats.innerHTML = `
+    <span class="cat-stat"><span class="cat-stat-num">${CARS.length}</span> Fahrzeuge</span>
+    <span class="cat-stat"><span class="cat-stat-num">${brands.length}</span> Marken</span>
+  `;
+
+  // Tier-Label-Map
+  const TIER_LABEL = {
+    premium: 'Premium', sport: 'Sport', suv: 'SUV', ev: 'Elektro',
+    luxury: 'Luxus', super: 'Super', hyper: 'Hyper', classic: 'Klassiker',
+  };
+  function tierBadge(t) {
+    return `<span class="cat-tier cat-tier--${t}">${TIER_LABEL[t] || t}</span>`;
+  }
+
+  function modelMatches(c) {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    return c.brand.toLowerCase().includes(q) || c.model.toLowerCase().includes(q);
+  }
+
+  function draw() {
+    body.innerHTML = '';
+    crumbs.hidden = !selectedBrand;
+
+    if (selectedBrand) {
+      // ----- Modell-Liste einer Marke -----
+      crumbs.innerHTML = `
+        <button type="button" class="cat-crumb-link" id="cat-crumb-home">📖 Alle Marken</button>
+        <span class="cat-crumb-sep">›</span>
+        <span class="cat-crumb-current">${escapeHtml(selectedBrand)}</span>
+      `;
+      $('#cat-crumb-home').addEventListener('click', () => {
+        selectedBrand = null;
+        activeTab = 'brands';
+        syncTabs();
+        draw();
+      });
+
+      const cars = (byBrand.get(selectedBrand) || []).filter(modelMatches);
+      const list = document.createElement('div');
+      list.className = 'cat-model-list';
+      if (cars.length === 0) {
+        list.innerHTML = `<div class="cat-empty">Keine Treffer.</div>`;
+      } else {
+        cars.forEach(c => {
+          const row = document.createElement('div');
+          row.className = 'cat-model-row';
+          row.innerHTML = `
+            ${brandBadgeHTML(c.brand, 'sm')}
+            <div class="cat-model-info">
+              <div class="cat-model-name">${escapeHtml(c.model)}</div>
+              <div class="cat-model-meta">${tierBadge(c.tier)}<span class="cat-model-emoji">${c.emoji || ''}</span></div>
+            </div>
+            <div class="cat-model-price">${fmtEUR(c.price)}</div>
+          `;
+          list.appendChild(row);
+        });
+      }
+      body.appendChild(list);
+      return;
+    }
+
+    if (activeTab === 'all') {
+      // ----- Alle Modelle (flach, sortiert nach Preis) -----
+      const cars = CARS.filter(modelMatches).slice().sort((a, b) => b.price - a.price);
+      const list = document.createElement('div');
+      list.className = 'cat-model-list';
+      if (cars.length === 0) {
+        list.innerHTML = `<div class="cat-empty">Keine Treffer.</div>`;
+      } else {
+        cars.forEach(c => {
+          const row = document.createElement('div');
+          row.className = 'cat-model-row cat-model-row--all';
+          row.innerHTML = `
+            ${brandBadgeHTML(c.brand, 'sm')}
+            <div class="cat-model-info">
+              <div class="cat-model-name">${escapeHtml(c.brand)} <span class="cat-model-sub">${escapeHtml(c.model)}</span></div>
+              <div class="cat-model-meta">${tierBadge(c.tier)}<span class="cat-model-emoji">${c.emoji || ''}</span></div>
+            </div>
+            <div class="cat-model-price">${fmtEUR(c.price)}</div>
+          `;
+          row.addEventListener('click', () => {
+            selectedBrand = c.brand;
+            search.value = '';
+            query = '';
+            draw();
+          });
+          list.appendChild(row);
+        });
+      }
+      body.appendChild(list);
+      return;
+    }
+
+    // ----- Marken-Grid -----
+    const filtered = query
+      ? brands.filter(b =>
+          b.name.toLowerCase().includes(query.toLowerCase()) ||
+          b.cars.some(c => c.model.toLowerCase().includes(query.toLowerCase()))
+        )
+      : brands;
+    const grid = document.createElement('div');
+    grid.className = 'cat-brand-grid';
+    if (filtered.length === 0) {
+      grid.innerHTML = `<div class="cat-empty">Keine Marken gefunden.</div>`;
+    } else {
+      filtered.forEach(b => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'cat-brand-card';
+        card.innerHTML = `
+          ${brandBadgeHTML(b.name, 'lg')}
+          <div class="cat-brand-info">
+            <div class="cat-brand-name">${escapeHtml(b.name)}</div>
+            <div class="cat-brand-sub">${b.count} Modell${b.count === 1 ? '' : 'e'} · ab ${fmtEUR(b.cars[b.cars.length - 1].price)}</div>
+          </div>
+          <div class="cat-brand-arrow">›</div>
+        `;
+        card.addEventListener('click', () => {
+          selectedBrand = b.name;
+          search.value = '';
+          query = '';
+          draw();
+        });
+        grid.appendChild(card);
+      });
+    }
+    body.appendChild(grid);
+  }
+
+  function syncTabs() {
+    tabs.forEach(t => {
+      const on = t.dataset.tab === activeTab;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+
+  tabs.forEach(t => {
+    t.addEventListener('click', () => {
+      activeTab = t.dataset.tab;
+      selectedBrand = null;
+      syncTabs();
+      draw();
+    });
+  });
+
+  let searchTimer = null;
+  search.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      query = search.value.trim();
+      draw();
+    }, 120);
+  });
+
+  draw();
 }
 
 // ============================================================
