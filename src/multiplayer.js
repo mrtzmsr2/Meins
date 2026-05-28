@@ -4,24 +4,25 @@ const ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 
 // STUN+TURN-Server fuer NAT-Traversal. Ohne TURN scheitern Verbindungen,
 // wenn Host und Joiner in unterschiedlichen Mobilfunk-/Symmetric-NATs sind.
-// Best-Effort: freie public TURN-Server (Stand 2026). Falls instabil,
-// auf bezahlten / eigenen TURN umstellen (siehe Doku Metered/Cloudflare).
+// Primaer: Metered.ca Free-Tier (500 MB/Monat, eigene Credentials).
+// Fallback: STUN (Google/Cloudflare) + ein paar oeffentliche TURNs.
+const METERED_USERNAME = 'd721b5b600ce537eb797fc15';
+const METERED_CREDENTIAL = 'CW6RjFH/vXhbdNs3';
 const ICE_CONFIG = {
   iceServers: [
-    // --- STUN (mehrere Google-Knoten als Fallback) ---
+    // --- Metered (primaer) ---
+    { urls: 'stun:stun.relay.metered.ca:80' },
+    { urls: 'turn:global.relay.metered.ca:80', username: METERED_USERNAME, credential: METERED_CREDENTIAL },
+    { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: METERED_USERNAME, credential: METERED_CREDENTIAL },
+    { urls: 'turn:global.relay.metered.ca:443', username: METERED_USERNAME, credential: METERED_CREDENTIAL },
+    { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: METERED_USERNAME, credential: METERED_CREDENTIAL },
+    // --- STUN-Fallback (mehrere Knoten) ---
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
-    // --- TURN: freestun.net (Frozenmountain, kostenlos, ohne Account) ---
+    // --- TURN-Fallback (oeffentlich, evtl. instabil) ---
     { urls: 'turn:freestun.net:3478', username: 'free', credential: 'free' },
-    { urls: 'turns:freestun.net:5349', username: 'free', credential: 'free' },
-    // --- TURN: openrelay (Metered) – Reste, evtl. tot, aber als Fallback drin ---
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
   ],
   iceCandidatePoolSize: 4,
 };
