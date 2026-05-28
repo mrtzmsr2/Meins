@@ -25,6 +25,8 @@ html, body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   min-height: 100dvh;
+  /* Pull-to-Refresh & Bounce-Overscroll deaktivieren (verhindert versehentliches Neuladen mitten im Spiel) */
+  overscroll-behavior-y: contain;
 }
 body { overflow-x: hidden; }
 button { font: inherit; color: var(--text); cursor: pointer; }

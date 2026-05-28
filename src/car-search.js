@@ -174,7 +174,11 @@ export function openCarSearch(title, opts = {}) {
       });
     }
 
-    q.addEventListener('input', () => renderResults(search(q.value, themeFilter)));
+    let _searchTimer = null;
+    q.addEventListener('input', () => {
+      if (_searchTimer) clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(() => renderResults(search(q.value, themeFilter)), 60);
+    });
     q.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         const list = search(q.value, themeFilter);
