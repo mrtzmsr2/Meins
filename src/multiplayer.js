@@ -4,15 +4,26 @@ const ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 
 // STUN+TURN-Server fuer NAT-Traversal. Ohne TURN scheitern Verbindungen,
 // wenn Host und Joiner in unterschiedlichen Mobilfunk-/Symmetric-NATs sind.
-// Open Relay (Metered) ist kostenlos und ohne Account nutzbar.
+// Best-Effort: freie public TURN-Server (Stand 2026). Falls instabil,
+// auf bezahlten / eigenen TURN umstellen (siehe Doku Metered/Cloudflare).
 const ICE_CONFIG = {
   iceServers: [
+    // --- STUN (mehrere Google-Knoten als Fallback) ---
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:openrelay.metered.ca:80' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    // --- TURN: freestun.net (Frozenmountain, kostenlos, ohne Account) ---
+    { urls: 'turn:freestun.net:3478', username: 'free', credential: 'free' },
+    { urls: 'turns:freestun.net:5349', username: 'free', credential: 'free' },
+    // --- TURN: openrelay (Metered) – Reste, evtl. tot, aber als Fallback drin ---
     { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
     { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
     { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
   ],
+  iceCandidatePoolSize: 4,
 };
 const PEER_OPTS = { debug: 1, config: ICE_CONFIG };
 
